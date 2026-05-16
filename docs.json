@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "Ligate Labs",
-  "description": "Developer documentation for Ligate — sovereign rollup, attestation protocol, and the three first-party flagship apps: Themisra (Proof of Prompt), Mneme (browser wallet), and Iris (MCP for AI agents).",
+  "description": "Developer documentation for Ligate, sovereign rollup, attestation protocol, and the three first-party flagship apps: Themisra (Proof of Prompt), Mneme (browser wallet), and Iris (MCP for AI agents).",
   "colors": {
     "primary": "#A7D28C",
     "light": "#A7D28C",
