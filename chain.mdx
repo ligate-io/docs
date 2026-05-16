@@ -22,7 +22,7 @@ Its core primitive is a generic, permissionless attestation protocol.
 | ----------------- | -------------------------------------------------------------------------- |
 | Rollup framework  | Sovereign SDK (Rust)                                                       |
 | Data availability | Celestia                                                                   |
-| Token             | `$LGT` — gas, registration fees, per-attestation fees, staking, governance |
+| Token             | `$LGT`, gas, registration fees, per-attestation fees, staking, governance |
 | Cross-chain       | Hyperlane (lands at v2)                                                    |
 
 ## Modules
@@ -32,19 +32,19 @@ application module; others are planned.
 
 ### Shipping at v0
 
-- **`attestation`** — schemas, attestor sets, write-once attestations. See
+- **`attestation`**, schemas, attestor sets, write-once attestations. See
   [Proof of Prompt](/proof-of-prompt) for the canonical consumer.
 
 ### Planned (v1)
 
-- **`identity`** — DID-like lookups, verified tags, metadata URIs
-- **`disputes`** — on-chain flagging + attestor slashing tied to AttestorSet
+- **`identity`**, DID-like lookups, verified tags, metadata URIs
+- **`disputes`**, on-chain flagging + attestor slashing tied to AttestorSet
   stake
 
 ### Planned (v2)
 
-- **`payments`** — metered billing and streaming on top of `bank`
-- **`agents`** — on-chain agent wallets with allowlists, rate limits, and
+- **`payments`**, metered billing and streaming on top of `bank`
+- **`agents`**, on-chain agent wallets with allowlists, rate limits, and
   delegation
 - Proof-carrying schemas (zkML / TEE proof hashes in attestation payloads)
 

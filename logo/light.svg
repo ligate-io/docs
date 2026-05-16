@@ -1,4 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="135" height="32" viewBox="0 0 135 32" fill="none" role="img" aria-label="Ligate Labs wordmark">
-  <title>Ligate Labs wordmark</title>
-  <text x="0" y="16" dominant-baseline="central" style="font-family:'Space Grotesk','Inter','Helvetica Neue',Arial,sans-serif;font-size:22px;font-weight:500;letter-spacing:-0.02em;" fill="#0a0a0b">Ligate Labs</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160" fill="none" role="img" aria-label="Ligate Labs">
+  <title>Ligate Labs</title>
+  <g transform="translate(20 24)">
+    <path d="M123.03 55.9332L115.623 68.7795L108.216 81.6154L100.819 94.4513L93.4121 107.277H34.2075L26.8004 94.4513L19.4037 81.6154H78.6187L86.0154 68.7795L93.4121 55.9332H123.03Z" stroke="#0a0a0b" stroke-width="9.2" stroke-linejoin="round"/>
+    <path d="M49.0113 30.2718L41.6042 43.0973L34.2075 55.9332L26.8004 68.7795L19.4037 81.6154L11.9967 68.7795L4.59998 55.9332L11.9967 43.0973L19.4037 30.2718H49.0113Z" stroke="#0a0a0b" stroke-width="9.2" stroke-linejoin="round"/>
+    <path d="M108.216 30.2718L100.819 43.0973L93.4121 55.9332H63.8046L71.2221 43.0973L78.6188 30.2718H49.0112L56.4079 17.4359L63.8046 4.60001H93.4121L100.819 17.4359L108.216 30.2718Z" stroke="#0a0a0b" stroke-width="9.2" stroke-linejoin="round"/>
+  </g>
+  <text x="184" y="98" style="font-family:'Space Grotesk','Inter','Helvetica Neue',Arial,sans-serif;font-size:72px;font-weight:500;letter-spacing:-1.5px;" fill="#0a0a0b">Ligate Labs</text>
 </svg>

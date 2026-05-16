@@ -1,0 +1,28 @@
+---
+title: 'Chain RPC'
+sidebarTitle: 'RPC'
+description: 'Direct REST surface exposed by every ligate-node. 115 endpoints under /v1/. Submit transactions, query ledger state, fetch chain identity, look up attestations and balances. OpenAPI 3 spec at /v1/openapi-v3.json.'
+---
+
+<Info>
+  This page is in active migration. Until then, every running node serves
+  Swagger UI at `/v1/swagger-ui` and the OpenAPI 3 spec at
+  `/v1/openapi-v3.json`. Source:
+  [github.com/ligate-io/ligate-chain](https://github.com/ligate-io/ligate-chain).
+</Info>
+
+The chain's REST API is **point lookups only by design**. List, range,
+time-bucketed, by-submitter, aggregation, top-N, and search queries
+live in the indexer service, not on the chain.
+
+| Prefix              | Count | Purpose                                                |
+| ------------------- | ----- | ------------------------------------------------------ |
+| `/v1/ledger/...`    | 17    | Block, batch, transaction, event queries               |
+| `/v1/sequencer/...` | 6     | Transaction submission, sequencer status, mempool      |
+| `/v1/rollup/...`    | 7     | Chain identity, sync, gas price, schema, simulate      |
+| `/v1/modules/...`   | 85    | Per-module state and custom queries                    |
+
+Full reference and per-endpoint detail lands in the next migration pass.
+For now, the canonical reference is
+[`docs/protocol/rest-api.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/rest-api.md)
+in the chain repo.
