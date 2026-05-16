@@ -4,92 +4,128 @@ sidebarTitle: 'Devnet'
 description: 'Ligate devnet network parameters, RPC endpoints, DA configuration, and faucet info. ligate-devnet-1 live on Celestia Mocha-testnet.'
 ---
 
-Network identifiers, RPC endpoints, DA configuration, and faucet info for the
-Ligate devnet.
+Network identifiers, RPC endpoints, DA configuration, and faucet info
+for the Ligate devnet.
 
 <Tip>
-  **Live.** `ligate-devnet-1` is running on Celestia Mocha-testnet. RPC, faucet,
-  and explorer are all up; parameters below are real. Breaking changes will be
-  flagged in the [changelog](https://ligate.io/changelog).
+  **Live.** `ligate-devnet-1` is running on Celestia Mocha-testnet. RPC,
+  faucet, and explorer are all up; parameters below are real. Breaking
+  changes will be flagged in the
+  [changelog](https://ligate.io/changelog).
 </Tip>
 
 ## Network parameters
 
-| Field     | Value                           |
-| --------- | ------------------------------- |
-| Network   | `ligate-devnet-1`               |
-| Chain ID  | `ligate-devnet-1`               |
-| Status    | Live · Celestia Mocha-testnet   |
-| RPC       | `https://rpc.devnet.ligate.io`  |
-| WebSocket | `wss://rpc.devnet.ligate.io/ws` |
-| Explorer  | `https://explorer.ligate.io`    |
-| DA layer  | `celestia-mocha`                |
-| Faucet    | 1000 $LGT / account / day       |
+| Field          | Value                                                                |
+| -------------- | -------------------------------------------------------------------- |
+| Network        | `ligate-devnet-1`                                                    |
+| Chain ID       | `ligate-devnet-1` (numeric: `4242`)                                  |
+| Status         | Live, Celestia Mocha-testnet                                         |
+| REST           | `https://rpc.devnet.ligate.io/v1/`                                   |
+| OpenAPI spec   | `https://rpc.devnet.ligate.io/v1/openapi-v3.json`                    |
+| Swagger UI     | `https://rpc.devnet.ligate.io/v1/swagger-ui`                         |
+| Explorer       | `https://explorer.ligate.io`                                         |
+| Faucet         | `https://faucet.ligate.io`, 100 `$LGT` per drip, 24h cooldown per address |
+| DA layer       | `celestia-mocha`                                                     |
+| Block time     | 1 second                                                             |
+| `$LGT` decimals | 9 (smallest unit: 1 nano `$LGT` = `0.000000001 $LGT`)               |
+
+## Address ladder
+
+Every Ligate identifier is Bech32m-encoded with a typed prefix:
+
+| Prefix    | Identifies                                          |
+| --------- | --------------------------------------------------- |
+| `lig1...` | account addresses                                   |
+| `lpk1...` | public keys (when encoded standalone)               |
+| `lsc1...` | schema ids                                          |
+| `las1...` | attestor-set ids                                    |
+| `lat1...` | attestation ids                                     |
+| `ltx1...` | transaction hashes                                  |
+| `lph1...` | payload hashes                                      |
+| `lcc1...` | NFT collection ids (when `nft` module ships)        |
+| `ltk1...` | fungible token denominations (when `tokens` ships)  |
 
 ## How users sign in
 
 <Note>
-  On `ligate-devnet-1` today: embedded sign-in lives inside the product apps
-  (v0.5). A standalone web wallet at `wallet.ligate.io` and a browser extension
-  are Phase 2 (v1).
+  On `ligate-devnet-1` today: keys live in the local OS keystore via the
+  CLI (`ligate keys generate`). A standalone web wallet at
+  `wallet.ligate.io` and the Mneme browser extension are Phase 2 (v1).
 </Note>
 
-Ligate is a non-EVM Sovereign SDK rollup with ed25519 keys and Bech32
-addresses (`lig1...`). Sign-in uses email or social login: keys are generated
-and custodied for the user, recovery works through their login. No
-browser-extension wallet required for v0.5.
-
-Pre-v0.5 readers building against devnet should integrate via the SDK and CLI
-below. Standalone wallet plans live on the
-[roadmap](https://ligate.io/roadmap).
+Ligate is a non-EVM Sovereign SDK rollup with ed25519 keys and Bech32m
+addresses (`lig1...`). The CLI manages keypairs in the OS keystore at
+mode 0600. Pre-extension, integrate via the SDK + CLI.
 
 ## Using the faucet
 
-The faucet drops 1000 testnet $LGT to any account once per 24 hours.
-Authenticate first, then claim:
+The faucet drips a fixed amount of testnet `$LGT` to any address once
+per 24 hours. No auth, no signing, the recipient doesn't need to hold
+the private key.
+
+CLI:
 
 ```bash
-ligate auth login --email you@yours.com
-# ✓ Signed in as lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b
-
-ligate faucet claim
-# ✓ 1000 $LGT sent · tx ltx1zd2qmly…ljgth4
+ligate keys generate --name alice
+ligate faucet $(ligate keys show alice)
 ```
 
-Rate limits are enforced per email + per wallet. If you need more, email
-[hello@ligate.io](mailto:hello@ligate.io), we can bump operators and node
-runners.
+HTTP:
+
+```bash
+curl -X POST https://faucet.ligate.io/faucet \
+  -H 'content-type: application/json' \
+  -d '{"address":"lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b"}'
+```
+
+Rate limits are per recipient address. If you're an operator or
+node-runner and need more, email
+[hello@ligate.io](mailto:hello@ligate.io).
 
 ## Service endpoints
 
-### RPC
+### Chain REST (`rpc.devnet.ligate.io`)
 
-Standard JSON-RPC over HTTPS. Supports all Sovereign SDK rollup methods, plus
-the Ligate-specific:
+115 endpoints under `/v1/`, all auto-discovered from the runtime
+composition. Point lookups only by design. See [Chain RPC](/rpc) for
+the path map and [`docs/protocol/rest-api.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/rest-api.md)
+in the chain repo for the full reference.
 
-```text
-ligate_submitPrompt      // submit a Proof of Prompt receipt
-ligate_getAttestation    // fetch an attestation by ID
-ligate_verifyAttestation // return verification result
-ligate_getAttestorSet    // current active attestor quorum
+### WebSocket streams
+
+The chain exposes a small set of WebSocket subscriptions under
+`/v1/ledger/`. There is no single global `/ws` endpoint. The available
+streams:
+
+| Path                                            | Stream                          |
+| ----------------------------------------------- | ------------------------------- |
+| `/v1/ledger/slots/latest/ws`                    | new slots as they arrive        |
+| `/v1/ledger/slots/finalized/ws`                 | slots as they finalize          |
+| `/v1/ledger/slots/latest/events/ws`             | events from the head            |
+| `/v1/ledger/aggregated-proofs/latest/ws`        | new aggregated proofs           |
+
+Example:
+
+```js
+const ws = new WebSocket('wss://rpc.devnet.ligate.io/v1/ledger/slots/latest/ws')
+ws.onmessage = (e) => console.log(JSON.parse(e.data))
 ```
 
-### Indexer / GraphQL
+### HTTP API (`api.ligate.io`)
 
-Public GraphQL endpoint for structured queries over attestations, Kleidon
-transactions, and balances.
-
-```text
-https://indexer.devnet.ligate.io/graphql
-```
+Unified service that hosts the faucet drip and the indexer query
+endpoints (blocks, txs, addresses, schemas). See the
+[ligate-api repo](https://github.com/ligate-io/ligate-api).
 
 ## Reset schedule
 
-During devnet, we reserve the right to reset the chain if we ship breaking
-protocol changes. Resets are announced on the
+During devnet, we reserve the right to reset the chain if we ship
+breaking protocol changes. Resets are announced on the
 [changelog](https://ligate.io/changelog) at least 72 hours in advance.
 
 <Tip>
-  Build against semver-tagged spec versions, not the live chain state. When we
-  reset, your code keeps working; only historical receipts are lost.
+  Build against semver-tagged spec versions, not the live chain state.
+  When we reset, your code keeps working; only historical receipts are
+  lost.
 </Tip>

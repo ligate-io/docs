@@ -1,91 +1,159 @@
 ---
 title: 'Proof of Prompt'
 sidebarTitle: 'Proof of Prompt'
-description: 'On-chain receipt spec for AI interactions. Hash a prompt and output, anchor via attestor quorum, verify anywhere. Spec v0.1.'
+description: 'On-chain receipt spec for AI interactions. Hash a prompt and response, anchor via attestor quorum, verify anywhere. Schema themisra.proof-of-prompt v1.0.0.'
 ---
 
-The on-chain receipt spec for AI interactions. Hash a prompt and an output,
-anchor it via an attestor quorum, verify it anywhere.
+The first canonical schema on Ligate Chain. Two layers, by design: the
+chain stores a compact generic Attestation record, the off-chain Themisra
+payload (defined by the schema) holds the actual prompt and response data.
 
 <Info>
-  **Spec status: v0.1.** The receipt format is stable. Phase 2 features (ZK
-  redaction, model attestation, chain-of-prompt) are tracked on the
-  [roadmap](https://ligate.io/roadmap).
+  **Spec status: v1.0.0** (LIP-5). The on-chain Attestation shape and the
+  Themisra payload shape are both stable. Future revisions ship as v2
+  with a new `schema_id`, not as mutations of v1.
 </Info>
 
-## What a receipt is
+## On-chain Attestation
 
-Every Proof of Prompt receipt is a seven-field tuple. Fields are
-canonicalised before hashing, the whole tuple is signed by an attestor
-quorum, and the blob is anchored on Celestia.
+Every attestation written by the `attestation` module is the same
+five-field tuple, regardless of which schema it belongs to:
 
-```json
-{
-  "prompt_hash":    sha256(canonical_prompt_bytes),
-  "output_hash":    sha256(canonical_output_bytes),
-  "model":          "claude-4.7-opus",
-  "temperature":    0.2,
-  "timestamp":      1745193600,
-  "user_wallet":    "lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b",
-  "attestor_sig":   "<BLS aggregate over quorum>"
+```rust
+pub struct Attestation {
+    pub schema_id: SchemaId,       // lsc1, schema this attestation is bound to
+    pub payload_hash: PayloadHash, // lph1, SHA-256 of canonical off-chain payload
+    pub submitter: Address,        // lig1, paid the fee, owns the record
+    pub timestamp: u64,            // block header time, not user-set
+    pub signatures: Vec<AttestorSignature>,
 }
 ```
 
+The chain never sees the prompt or response. It stores a digest
+(`payload_hash`) plus the attestor signatures.
+
+## Off-chain Themisra payload
+
+The JSON payload that `payload_hash` is computed against. Schema
+`themisra.proof-of-prompt v1.0.0`. Required: `spec_version`, `user_did`,
+`model_id`, `prompt_hash`, `response_hash`, `created_at`. Everything
+else is optional.
+
+```json
+{
+  "spec_version": "1.0.0",
+  "user_did": "lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b",
+  "model_id": "anthropic/claude-opus:4.7",
+  "prompt_hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+  "response_hash": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+  "created_at": "2026-05-16T20:30:00Z",
+  "system_prompt_hash": "<optional 64-char hex>",
+  "provider_id": "api.anthropic.com",
+  "tool_id": "mneme",
+  "prompt_uri": "<optional>",
+  "response_uri": "<optional>"
+}
+```
+
+Canonical schema:
+[`docs/protocol/schemas/themisra.proof-of-prompt-v1.json`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/schemas/themisra.proof-of-prompt-v1.json).
+
+## Identifiers
+
+- **`user_did`** identifies the human prompter. Accepts a chain bech32m
+  address (`lig1...`), a W3C DID URL (`did:web:...`, `did:key:...`),
+  or the chain-native DID form (`did:lig:<address>`).
+- The signer of the `SubmitAttestation` tx is a SEPARATE identity,
+  often a relayer (Mneme acting on the user's behalf, Iris signing for
+  an agent). Recorded in the tx envelope as `submitter`.
+- **`model_id`** recommended form: `<provider>/<model>:<version>`, e.g.
+  `anthropic/claude-opus:4.7`, `openai/gpt-4o:2025-01-01`,
+  `google/gemini-pro:2.5`. Free-form in v1; LIP-5 may pin a registry
+  in a later revision.
+
 ## Canonical bytes
 
-Hashing is only useful if two parties agree on what was hashed. Before
-hashing, prompt and output bytes are canonicalised:
+Hashing only works if two parties agree on what was hashed.
 
-- UTF-8 encoding
-- Normalised line endings (LF only)
-- Tokenizer-agnostic (we hash text, not tokens)
-- Binary inputs (images, audio) hashed over raw bytes
+- **`prompt_hash` and `response_hash`** are SHA-256 over the canonical
+  text bytes: NFC-normalised Unicode, no leading or trailing
+  whitespace, LF line endings, UTF-8. Hex-encoded, lowercase, no
+  `0x` prefix.
+- **`payload_hash`** is SHA-256 over the canonical Borsh encoding of
+  the on-chain `SignedAttestationPayload` (schema_id, payload_hash,
+  submitter, timestamp). Stored as `lph1...`.
+
+Off-chain attestor services SHOULD reject payloads whose claimed
+`prompt_hash` doesn't match the canonicalised prompt they witnessed,
+or whose `created_at` is in the future or more than 24 hours in the
+past relative to the sign request.
 
 ## Attestor quorum
 
-Each receipt is signed by a threshold (2/3) of the active attestor set.
-Attestors stake `$LGT` and earn fees per receipt. Equivocation is slashable.
-The BLS aggregate means the receipt takes the same on-chain footprint
-regardless of quorum size.
+Each schema declares its own AttestorSet at registration. The set has:
 
-### Threshold
+- **`members`**: list of attestor public keys (ed25519 by default; the
+  signature byte cap leaves headroom for BLS or other schemes in v1+)
+- **`threshold`**: minimum count of valid signatures from `members`
+  required for the attestation to land
 
-The threshold is `ceil(2n/3)` where `n` is the active attestor set. At the
-genesis attestor count of 62, threshold is 42.
+For `themisra.proof-of-prompt v1.0.0`, the v0 devnet runs a 3-of-?
+federated quorum with attestor pubkeys assigned at the operator key
+ceremony.
+
+Each `AttestorSignature` on the attestation contains:
+
+```rust
+pub struct AttestorSignature {
+    pub pubkey: PubKey,    // must appear in schema.attestor_set.members
+    pub sig: SafeVec<u8>,  // signature over SignedAttestationPayload
+}
+```
+
+The chain validates that the count of valid signatures `>=`
+`attestor_set.threshold`.
 
 ## Verification
 
-Verification is three independent checks. All three must pass.
+Three checks. All three must pass.
+
+1. The `Attestation` exists on-chain. Point lookup by
+   `(schema_id, payload_hash)`.
+2. Recompute `payload_hash` from the off-chain payload, matches what's
+   on-chain.
+3. Recompute each `AttestorSignature` over the canonical
+   `SignedAttestationPayload`, count of valid signatures `>=`
+   `attestor_set.threshold`.
 
 ```bash
-ligate verify lat1c3a87e…fd9a7c
-# ✓ receipt anchored (celestia-mocha block 1,481,207)
-# ✓ attestor quorum met (42/62 signed, threshold 42/62)
-# ✓ BLS aggregate valid
+ligate query attestation <schemaId>:<payloadHash>
+# returns the on-chain Attestation record
 ```
 
-## ZK redaction · Phase 2
+## ZK redaction, Phase 2
 
-Phase 2 of the spec adds zero-knowledge redaction via SP1 or RISC Zero. A
-redactable receipt proves the fields are internally consistent (hashes
-match, model is in the registry, timestamp is in range) without revealing
-prompt or output content. Enterprises with IP-sensitive prompts get proof
-without disclosure.
+Phase 2 adds zero-knowledge redaction via SP1 or RISC Zero. A redactable
+receipt proves the fields are internally consistent (hashes match,
+`model_id` is in a registry, `created_at` is in range) without revealing
+prompt or response content. Enterprises with IP-sensitive prompts get
+proof without disclosure.
 
 <Note>
   Phase 2 is tracked on the public [roadmap](https://ligate.io/roadmap).
 </Note>
 
-## What's not in v0.1
+## What's not in v1
 
-- **Model attestation.** We hash the model ID string but don't yet verify
-  the model provider actually ran those weights. Future Phase 3 work
-  involving TEEs or MPC inference.
+- **Model attestation.** We hash the `model_id` string but don't yet
+  verify the model provider actually ran those weights. Future Phase 3
+  work involving TEEs or MPC inference.
 - **Chain-of-prompt.** Prompts often depend on prior prompts (tools,
-  retrieval, agent loops). v0.1 treats each as independent. v0.2 will
-  encode causal chains.
+  retrieval, agent loops). v1 treats each as independent. A future
+  revision will encode causal chains.
 
 <Tip>
-  Full RFC and any open discussions live in
-  [ligate-io](https://github.com/ligate-io) on GitHub.
+  Full RFC and open discussion: [LIP-5 on
+  ligate-chain](https://github.com/ligate-io/ligate-chain/issues/185).
+  Schema source:
+  [`docs/protocol/schemas/themisra.proof-of-prompt-v1.json`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/schemas/themisra.proof-of-prompt-v1.json).
 </Tip>

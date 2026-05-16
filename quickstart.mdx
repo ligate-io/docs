@@ -1,114 +1,131 @@
 ---
 title: 'Quickstart'
 sidebarTitle: 'Quickstart'
-description: 'Install the Ligate CLI, claim testnet $LGT, and ship your first Proof of Prompt attestation. End-to-end in under five minutes.'
+description: 'Install the Ligate CLI, claim testnet $LGT, and ship your first attestation against ligate-devnet-1. End-to-end in under five minutes.'
 ---
 
-Install the Ligate CLI, claim testnet $LGT from the faucet, and ship your
-first Proof of Prompt attestation. End-to-end in under five minutes.
+Install the Ligate CLI, claim testnet `$LGT` from the faucet, and ship
+your first attestation against `ligate-devnet-1`. End-to-end in under
+five minutes.
 
 <Tip>
-  **`ligate-devnet-1` is live.** The CLI, faucet, RPC, and explorer are all up
-  against Celestia Mocha-testnet. The commands below work; expect breaking
-  changes to land in the [changelog](https://ligate.io/changelog) as v1 work
-  continues on top.
+  **`ligate-devnet-1` is live.** The CLI, faucet, RPC, and explorer
+  are all up against Celestia Mocha-testnet. The commands below work,
+  expect breaking changes to land in the
+  [changelog](https://ligate.io/changelog) as v1 hardening continues.
 </Tip>
 
 <Steps>
   <Step title="Install the CLI">
-    One-line install, planned for macOS, Linux, and Windows (WSL).
+    Pre-built tarball install. macOS and Linux supported.
 
     ```bash
-    curl -s https://ligate.io/install | sh
+    # Pick PLATFORM = linux-amd64 | linux-arm64 | darwin-arm64 | darwin-amd64
+    curl -L -o ligate.tar.gz \
+      https://github.com/ligate-io/ligate-cli/releases/latest/download/ligate-PLATFORM.tar.gz
+    tar -xzf ligate.tar.gz
+    sudo mv ligate /usr/local/bin/
     ligate --version
-    # ligate-cli 0.x.x-devnet
     ```
 
+    Or build from source: `cargo install --git https://github.com/ligate-io/ligate-cli`.
+    See [the CLI page](/cli) for both paths in detail.
   </Step>
 
-  <Step title="Sign in">
-    Email or social login. Keys are generated and custodied for you, recovery
-    works through your login. No browser-extension wallet required for v0.5.
-    Ligate is a non-EVM Sovereign SDK rollup with ed25519 keys and Bech32
-    addresses (`lig1...`).
+  <Step title="Generate a key">
+    The CLI manages ed25519 keypairs in the OS keystore at mode 0600.
+    Ligate is a non-EVM Sovereign SDK rollup with Bech32m addresses
+    (`lig1...`).
 
     ```bash
-    ligate auth login --email you@yours.com
-    # ✓ Check your email for a sign-in link
-    # ✓ Signed in as lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b
+    ligate keys generate --name alice
+    ligate keys show alice
+    # lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b
     ```
-
   </Step>
 
   <Step title="Claim testnet $LGT">
-    Every new account gets 1000 $LGT from the faucet per day. You need gas to
-    submit an attestation transaction.
+    The public devnet faucet drips 100 `$LGT` to any address once per
+    24 hours.
 
     ```bash
-    ligate faucet claim
-    # ✓ 1000 $LGT sent
-    #   tx       ltx1zd2qmly…ljgth4
-    #   block    1,481,203
-    #   explorer https://explorer.ligate.io/tx/ltx1zd2qmly…ljgth4
+    ligate faucet $(ligate keys show alice)
+    # ✓ 100 $LGT sent
+    #   tx ltx1zd2qmly…ljgth4
     ```
 
+    No signing, no auth, recipient doesn't need to hold the private
+    key. See [Devnet, faucet](/devnet#using-the-faucet) for the HTTP
+    shape.
   </Step>
 
-  <Step title="Your first attestation">
-    The basic shape of a Proof of Prompt: hand the CLI a prompt, a model, and
-    (optionally) a response file. It hashes everything, submits the receipt to
-    the chain, waits for the attestor quorum, and returns a verifiable receipt
-    id.
+  <Step title="Check the balance arrived">
+    ```bash
+    ligate balance $(ligate keys show alice)
+    # { "amount": "100000000000", "tokenId": "..." }
+    ```
+
+    Amount is in nano `$LGT` (9 decimals). 100,000,000,000 nano =
+    100 `$LGT`.
+  </Step>
+
+  <Step title="Submit an attestation">
+    Build, sign, and submit a Proof of Prompt attestation against the
+    canonical `themisra.proof-of-prompt v1.0.0` schema. The CLI
+    handles the canonical payload encoding and threshold signing.
 
     ```bash
     ligate attest \
-      --model claude-4.7-opus \
+      --schema themisra.proof-of-prompt/v1 \
+      --model-id "anthropic/claude-opus:4.7" \
       --prompt "Write a recursive descent parser in Rust" \
-      --output ./response.md
-
-    # ✓ attestation lat1c3a87e…fd9a7c anchored (celestia-mocha)
-    #   quorum 42/62 attestors signed
-    #   gas    0.0009 $LGT
-    #   block  1,481,207
+      --response ./response.md \
+      --signer alice
+    # ✓ attestation lat1c3a87e…fd9a7c submitted
+    #   on-chain block 1,481,207
     ```
 
+    Behind the scenes: the CLI canonicalises the prompt + response,
+    computes SHA-256 of each, assembles the off-chain Themisra payload
+    (including `user_did = did:lig:lig1...`), hashes the payload to
+    `payload_hash`, collects the federated attestor quorum's
+    signatures, and submits the on-chain `SubmitAttestation` tx.
   </Step>
 </Steps>
 
 ## Verify it
 
-Anyone can verify a receipt. Verification checks three things: that the blob
-is anchored on Celestia, that the attestor quorum met threshold, and that the
-BLS aggregate signature is valid.
+Anyone can verify a receipt by querying the chain. The on-chain
+record is keyed by `(schema_id, payload_hash)`:
 
 ```bash
-ligate verify lat1c3a87e…fd9a7c
-# ✓ receipt anchored (celestia-mocha block 1,481,207)
-# ✓ attestor quorum met (42/62 signed, threshold 42/62)
-# ✓ BLS aggregate valid
+ligate query attestation <schemaId>:<payloadHash>
+# returns the Attestation: submitter, timestamp, signatures
 ```
 
-<Note>
-  The receipt's `prompt_hash` and `output_hash` are SHA-256 over canonical UTF-8
-  bytes. See the [Proof of Prompt spec](/proof-of-prompt) for the exact
-  canonicalisation rules.
-</Note>
+Full verification (recomputing `payload_hash` from your local copy of
+the off-chain payload, re-checking each attestor signature against the
+schema's `attestor_set`) is documented in the
+[Proof of Prompt spec](/proof-of-prompt#verification).
 
 ## What's next
 
-You've run an end-to-end attestation. A few places to go from here:
-
 <CardGroup cols={3}>
   <Card title="Embed in your app" icon="code" href="/sdks">
-    Use the Python / TypeScript / Rust / Go SDKs to submit attestations from
-    your service.
+    Use the TypeScript SDK to submit attestations from your service.
   </Card>
 
-<Card title="Run an attestor node" icon="server" href="/nodes">
-  Sign Proof of Prompt receipts, post blobs to Celestia, earn testnet $LGT.
-</Card>
+  <Card title="Run an attestor node" icon="server" href="/nodes">
+    Sign Proof of Prompt receipts, post blobs to Celestia, earn
+    testnet `$LGT`.
+  </Card>
 
-  <Card title="Read the Proof of Prompt spec" icon="book" href="/proof-of-prompt">
-    Field-by-field reference, canonical encoding, attestor quorum rules.
+  <Card
+    title="Read the Proof of Prompt spec"
+    icon="book"
+    href="/proof-of-prompt"
+  >
+    Field-by-field reference, canonical encoding, attestor quorum
+    rules.
   </Card>
 </CardGroup>
