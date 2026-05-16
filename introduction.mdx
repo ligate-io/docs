@@ -1,0 +1,87 @@
+---
+title: 'Introduction'
+sidebarTitle: 'Introduction'
+description: 'Developer documentation for Ligate — sovereign rollup, attestation protocol, and the three first-party flagship apps: Themisra (Proof of Prompt), Mneme (browser wallet), and Iris (MCP for AI agents). Third-party schemas register on the same permissionless protocol.'
+---
+
+Everything you need to build on the Ligate sovereign rollup. The attestation
+protocol, Proof of Prompt receipts, the Mneme wallet surface, the Iris MCP
+server, client SDKs, node operator guides, and the reference for every
+primitive.
+
+<Tip>
+  `ligate-devnet-1` is live on Celestia Mocha-testnet. The CLI, faucet, RPC, and
+  explorer are all running. v1 hardening continues on top, breaking changes
+  flagged in the [changelog](https://ligate.io/changelog).
+</Tip>
+
+This is the developer documentation for Ligate Labs. It is early. Some pages
+are drafts, some are empty outlines. We're filling it in as the devnet firms
+up — the goal is that by mainnet, every surface a developer touches is
+documented, with runnable examples.
+
+## Start here
+
+<CardGroup cols={2}>
+  <Card title="Getting started" icon="rocket" href="/quickstart">
+    Install the CLI, claim $LGT from the faucet, ship your first attestation.
+    End-to-end in under five minutes.
+  </Card>
+
+<Card title="Devnet" icon="network-wired" href="/devnet">
+  Network details, RPC endpoints, chain id, faucet. Everything an SDK or CLI
+  needs to talk to Ligate devnet.
+</Card>
+
+<Card title="Proof of Prompt" icon="signature" href="/proof-of-prompt">
+  The on-chain receipt spec for AI interactions. Fields, canonical encoding,
+  attestor quorum, verification.
+</Card>
+
+  <Card title="SDKs" icon="code" href="/sdks">
+    Client libraries for Python, TypeScript, Rust, and Go. Plus Unity C# and
+    Unreal C++ for game-asset integrations.
+  </Card>
+</CardGroup>
+
+## By product
+
+<CardGroup cols={3}>
+  <Card title="Themisra" icon="check-double" href="/themisra">
+    Hash any prompt + output pair, quorum-attest it on-chain, verify it
+    anywhere. Model-agnostic (Claude, GPT, Gemini, Llama, any OpenAI-compatible
+    endpoint).
+  </Card>
+
+<Card title="Mneme" icon="wallet" href="/mneme">
+  First-party non-custodial browser wallet for Ligate. ed25519 native, signs
+  every chain transaction, ships with a one-click "Attest with Mneme" button
+  injected into ChatGPT, Claude, and Gemini.
+</Card>
+
+  <Card title="Iris" icon="robot" href="/iris">
+    MCP server + USD-billed relayer. Any Claude Desktop, Cursor, LangGraph, or
+    OpenAI Agents SDK agent gets cryptographic attestation of every action in
+    ~10 lines.
+  </Card>
+</CardGroup>
+
+## Run infrastructure
+
+<CardGroup cols={2}>
+  <Card title="Node operators" icon="server" href="/nodes">
+    Hardware requirements, Docker image, stake + slashing, Grafana dashboard.
+    Run an attestor on devnet and earn testnet $LGT.
+  </Card>
+
+  <Card title="Status" icon="signal" href="https://ligate.io/status">
+    Per-component state of Ligate services. Updated in real time post-mainnet.
+  </Card>
+</CardGroup>
+
+## Stay current
+
+Release notes live on the main site at
+[ligate.io/changelog](https://ligate.io/changelog). Research posts and
+specs-in-draft on [the blog](https://ligate.io/blog). Questions →
+[hello@ligate.io](mailto:hello@ligate.io); RFCs → GitHub.

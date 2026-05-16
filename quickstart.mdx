@@ -1,81 +1,114 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
-icon: 'rocket'
+title: 'Quickstart'
+sidebarTitle: 'Quickstart'
+description: 'Install the Ligate CLI, claim testnet $LGT, and ship your first Proof of Prompt attestation. End-to-end in under five minutes.'
 ---
 
-## Get started in three steps
+Install the Ligate CLI, claim testnet $LGT from the faucet, and ship your
+first Proof of Prompt attestation. End-to-end in under five minutes.
 
-Get your documentation site running locally and make your first customization.
+<Tip>
+  **`ligate-devnet-1` is live.** The CLI, faucet, RPC, and explorer are all up
+  against Celestia Mocha-testnet. The commands below work; expect breaking
+  changes to land in the [changelog](https://ligate.io/changelog) as v1 work
+  continues on top.
+</Tip>
 
-### Step 1: Set up your local environment
+<Steps>
+  <Step title="Install the CLI">
+    One-line install, planned for macOS, Linux, and Windows (WSL).
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash
+    curl -s https://ligate.io/install | sh
+    ligate --version
+    # ligate-cli 0.x.x-devnet
+    ```
 
-### Step 2: Deploy your changes
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+  <Step title="Sign in">
+    Email or social login. Keys are generated and custodied for you, recovery
+    works through your login. No browser-extension wallet required for v0.5.
+    Ligate is a non-EVM Sovereign SDK rollup with ed25519 keys and Bech32
+    addresses (`lig1...`).
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    ```bash
+    ligate auth login --email you@yours.com
+    # ✓ Check your email for a sign-in link
+    # ✓ Signed in as lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b
+    ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+  </Step>
 
-### Step 3: Go live
+  <Step title="Claim testnet $LGT">
+    Every new account gets 1000 $LGT from the faucet per day. You need gas to
+    submit an attestation transaction.
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    ```bash
+    ligate faucet claim
+    # ✓ 1000 $LGT sent
+    #   tx       ltx1zd2qmly…ljgth4
+    #   block    1,481,203
+    #   explorer https://explorer.ligate.io/tx/ltx1zd2qmly…ljgth4
+    ```
 
-## Next steps
+  </Step>
 
-Now that you have your docs running, explore these key features:
+  <Step title="Your first attestation">
+    The basic shape of a Proof of Prompt: hand the CLI a prompt, a model, and
+    (optionally) a response file. It hashes everything, submits the receipt to
+    the chain, waits for the attestor quorum, and returns a verifiable receipt
+    id.
 
-<CardGroup cols={2}>
+    ```bash
+    ligate attest \
+      --model claude-4.7-opus \
+      --prompt "Write a recursive descent parser in Rust" \
+      --output ./response.md
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+    # ✓ attestation lat1c3a87e…fd9a7c anchored (celestia-mocha)
+    #   quorum 42/62 attestors signed
+    #   gas    0.0009 $LGT
+    #   block  1,481,207
+    ```
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+  </Step>
+</Steps>
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+## Verify it
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+Anyone can verify a receipt. Verification checks three things: that the blob
+is anchored on Celestia, that the attestor quorum met threshold, and that the
+BLS aggregate signature is valid.
 
-</CardGroup>
+```bash
+ligate verify lat1c3a87e…fd9a7c
+# ✓ receipt anchored (celestia-mocha block 1,481,207)
+# ✓ attestor quorum met (42/62 signed, threshold 42/62)
+# ✓ BLS aggregate valid
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  The receipt's `prompt_hash` and `output_hash` are SHA-256 over canonical UTF-8
+  bytes. See the [Proof of Prompt spec](/proof-of-prompt) for the exact
+  canonicalisation rules.
 </Note>
+
+## What's next
+
+You've run an end-to-end attestation. A few places to go from here:
+
+<CardGroup cols={3}>
+  <Card title="Embed in your app" icon="code" href="/sdks">
+    Use the Python / TypeScript / Rust / Go SDKs to submit attestations from
+    your service.
+  </Card>
+
+<Card title="Run an attestor node" icon="server" href="/nodes">
+  Sign Proof of Prompt receipts, post blobs to Celestia, earn testnet $LGT.
+</Card>
+
+  <Card title="Read the Proof of Prompt spec" icon="book" href="/proof-of-prompt">
+    Field-by-field reference, canonical encoding, attestor quorum rules.
+  </Card>
+</CardGroup>

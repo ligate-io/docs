@@ -1,0 +1,95 @@
+---
+title: 'Devnet'
+sidebarTitle: 'Devnet'
+description: 'Ligate devnet network parameters, RPC endpoints, DA configuration, and faucet info. ligate-devnet-1 live on Celestia Mocha-testnet.'
+---
+
+Network identifiers, RPC endpoints, DA configuration, and faucet info for the
+Ligate devnet.
+
+<Tip>
+  **Live.** `ligate-devnet-1` is running on Celestia Mocha-testnet. RPC, faucet,
+  and explorer are all up; parameters below are real. Breaking changes will be
+  flagged in the [changelog](https://ligate.io/changelog).
+</Tip>
+
+## Network parameters
+
+| Field     | Value                           |
+| --------- | ------------------------------- |
+| Network   | `ligate-devnet-1`               |
+| Chain ID  | `ligate-devnet-1`               |
+| Status    | Live · Celestia Mocha-testnet   |
+| RPC       | `https://rpc.devnet.ligate.io`  |
+| WebSocket | `wss://rpc.devnet.ligate.io/ws` |
+| Explorer  | `https://explorer.ligate.io`    |
+| DA layer  | `celestia-mocha`                |
+| Faucet    | 1000 $LGT / account / day       |
+
+## How users sign in
+
+<Note>
+  On `ligate-devnet-1` today: embedded sign-in lives inside the product apps
+  (v0.5). A standalone web wallet at `wallet.ligate.io` and a browser extension
+  are Phase 2 (v1).
+</Note>
+
+Ligate is a non-EVM Sovereign SDK rollup with ed25519 keys and Bech32
+addresses (`lig1...`). Sign-in uses email or social login: keys are generated
+and custodied for the user, recovery works through their login. No
+browser-extension wallet required for v0.5.
+
+Pre-v0.5 readers building against devnet should integrate via the SDK and CLI
+below. Standalone wallet plans live on the
+[roadmap](https://ligate.io/roadmap).
+
+## Using the faucet
+
+The faucet drops 1000 testnet $LGT to any account once per 24 hours.
+Authenticate first, then claim:
+
+```bash
+ligate auth login --email you@yours.com
+# ✓ Signed in as lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b
+
+ligate faucet claim
+# ✓ 1000 $LGT sent · tx ltx1zd2qmly…ljgth4
+```
+
+Rate limits are enforced per email + per wallet. If you need more, email
+[hello@ligate.io](mailto:hello@ligate.io) — we can bump operators and node
+runners.
+
+## Service endpoints
+
+### RPC
+
+Standard JSON-RPC over HTTPS. Supports all Sovereign SDK rollup methods, plus
+the Ligate-specific:
+
+```text
+ligate_submitPrompt      // submit a Proof of Prompt receipt
+ligate_getAttestation    // fetch an attestation by ID
+ligate_verifyAttestation // return verification result
+ligate_getAttestorSet    // current active attestor quorum
+```
+
+### Indexer / GraphQL
+
+Public GraphQL endpoint for structured queries over attestations, Kleidon
+transactions, and balances.
+
+```text
+https://indexer.devnet.ligate.io/graphql
+```
+
+## Reset schedule
+
+During devnet, we reserve the right to reset the chain if we ship breaking
+protocol changes. Resets are announced on the
+[changelog](https://ligate.io/changelog) at least 72 hours in advance.
+
+<Tip>
+  Build against semver-tagged spec versions, not the live chain state. When we
+  reset, your code keeps working; only historical receipts are lost.
+</Tip>

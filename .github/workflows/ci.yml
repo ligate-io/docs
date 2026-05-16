@@ -1,0 +1,33 @@
+name: CI
+
+# Mintlify deploys main on push automatically, but doesn't surface
+# build/link failures back to the PR. This job catches them at PR time.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: CI pass
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Mintlify broken-links
+        # `mint` is the Mintlify CLI. `-y` auto-confirms install.
+        # `broken-links` walks every MDX reference and validates each
+        # internal href + image src exists. Fails the job if anything
+        # 404s inside the docs.
+        run: npx -y mint@latest broken-links

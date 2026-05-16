@@ -1,0 +1,91 @@
+---
+title: 'Proof of Prompt'
+sidebarTitle: 'Proof of Prompt'
+description: 'On-chain receipt spec for AI interactions. Hash a prompt and output, anchor via attestor quorum, verify anywhere. Spec v0.1.'
+---
+
+The on-chain receipt spec for AI interactions. Hash a prompt and an output,
+anchor it via an attestor quorum, verify it anywhere.
+
+<Info>
+  **Spec status: v0.1.** The receipt format is stable. Phase 2 features (ZK
+  redaction, model attestation, chain-of-prompt) are tracked on the
+  [roadmap](https://ligate.io/roadmap).
+</Info>
+
+## What a receipt is
+
+Every Proof of Prompt receipt is a seven-field tuple. Fields are
+canonicalised before hashing, the whole tuple is signed by an attestor
+quorum, and the blob is anchored on Celestia.
+
+```json
+{
+  "prompt_hash":    sha256(canonical_prompt_bytes),
+  "output_hash":    sha256(canonical_output_bytes),
+  "model":          "claude-4.7-opus",
+  "temperature":    0.2,
+  "timestamp":      1745193600,
+  "user_wallet":    "lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b",
+  "attestor_sig":   "<BLS aggregate over quorum>"
+}
+```
+
+## Canonical bytes
+
+Hashing is only useful if two parties agree on what was hashed. Before
+hashing, prompt and output bytes are canonicalised:
+
+- UTF-8 encoding
+- Normalised line endings (LF only)
+- Tokenizer-agnostic (we hash text, not tokens)
+- Binary inputs (images, audio) hashed over raw bytes
+
+## Attestor quorum
+
+Each receipt is signed by a threshold (2/3) of the active attestor set.
+Attestors stake `$LGT` and earn fees per receipt. Equivocation is slashable.
+The BLS aggregate means the receipt takes the same on-chain footprint
+regardless of quorum size.
+
+### Threshold
+
+The threshold is `ceil(2n/3)` where `n` is the active attestor set. At the
+genesis attestor count of 62, threshold is 42.
+
+## Verification
+
+Verification is three independent checks. All three must pass.
+
+```bash
+ligate verify lat1c3a87e…fd9a7c
+# ✓ receipt anchored (celestia-mocha block 1,481,207)
+# ✓ attestor quorum met (42/62 signed, threshold 42/62)
+# ✓ BLS aggregate valid
+```
+
+## ZK redaction · Phase 2
+
+Phase 2 of the spec adds zero-knowledge redaction via SP1 or RISC Zero. A
+redactable receipt proves the fields are internally consistent (hashes
+match, model is in the registry, timestamp is in range) without revealing
+prompt or output content. Enterprises with IP-sensitive prompts get proof
+without disclosure.
+
+<Note>
+  Phase 2 is tracked on the public [roadmap](https://ligate.io/roadmap).
+</Note>
+
+## What's not in v0.1
+
+- **Model attestation.** We hash the model ID string but don't yet verify
+  the model provider actually ran those weights. Future Phase 3 work
+  involving TEEs or MPC inference.
+- **Chain-of-prompt.** Prompts often depend on prior prompts (tools,
+  retrieval, agent loops). v0.1 treats each as independent. v0.2 will
+  encode causal chains.
+
+<Tip>
+  Full RFC and any open discussions live in
+  [ligate-io](https://github.com/ligate-io) on GitHub.
+</Tip>

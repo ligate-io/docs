@@ -1,0 +1,133 @@
+---
+title: 'CLI'
+sidebarTitle: 'CLI'
+description: 'The ligate command-line tool. Generate keys, claim from the faucet, transfer $LGT, register schemas and submit attestations against ligate-devnet-1.'
+---
+
+Operator and builder surface for Ligate Chain. Generate keys, claim from the
+faucet, transfer $LGT, register schemas, and submit attestations against
+`ligate-devnet-1`. Written in Rust, no JS runtime required.
+
+<Tip>
+  Wires up against `ligate-devnet-1` out of the box. Latest release:
+  [`v0.1.0-devnet`](https://github.com/ligate-io/ligate-cli/releases/tag/v0.1.0-devnet).
+</Tip>
+
+## Install
+
+Two paths, in preference order. **Pre-built tarball is recommended** — it is
+platform-native, has no Rust toolchain dependency, and installs in about
+thirty seconds.
+
+### 1. Pre-built tarball
+
+Each tagged release attaches platform tarballs for `linux-x86_64`,
+`linux-arm64`, `darwin-arm64`, and `darwin-amd64`, each with a SHA-256
+sidecar.
+
+```bash
+# Pick PLATFORM = linux-amd64 | linux-arm64 | darwin-arm64 | darwin-amd64
+curl -L -o ligate.tar.gz \
+  https://github.com/ligate-io/ligate-cli/releases/download/v0.1.0-devnet/ligate-v0.1.0-devnet-PLATFORM.tar.gz
+tar -xzf ligate.tar.gz
+sudo mv ligate /usr/local/bin/
+ligate --help
+```
+
+### 2. Build from source
+
+Fallback when a tagged tarball is not published for your platform, or when
+you want to track `main` ahead of a release. Linux needs `libclang-dev` for
+the chain's transitive `librocksdb-sys` build script.
+
+```bash
+# Linux first install: sudo apt install -y libclang-dev clang
+# macOS first install:  xcode-select --install
+
+# Expect 10-15 min cold-cache, ~5 min warm. Pulls ~3 GiB of git deps.
+SKIP_GUEST_BUILD=1 RISC0_SKIP_BUILD_KERNELS=1 \
+  cargo install --git https://github.com/ligate-io/ligate-cli
+```
+
+The two env vars skip the Risc0 zkVM guest compile; the CLI does not run real
+proving so a mock zkVM is fine. Without them you would also need the `risc0`
+toolchain via `rzup install`.
+
+## Quick start
+
+```bash
+# Generate a keypair (writes to OS keystore dir, mode 0600)
+ligate keys generate --name alice
+
+# Show your address
+ligate keys show alice
+
+# Claim a one-shot drip from the devnet faucet
+ligate faucet $(ligate keys show alice)
+
+# Check the balance arrived
+ligate balance $(ligate keys show alice) --token-id <hex>
+
+# Send some $LGT to another address
+ligate transfer \
+    --to lig1xyz...                    \
+    --amount 0.5                       \
+    --signer alice                     \
+    --chain-id 1                       \
+    --chain-hash <64-char-hex>         \
+    --token-id <64-char-hex>
+```
+
+Every chain-identity flag also accepts an env var: `LIGATE_RPC`,
+`LIGATE_CHAIN_ID`, `LIGATE_CHAIN_HASH`, `LIGATE_LGT_TOKEN_ID`. Set them once
+in your shell and the flags become optional.
+
+## Commands
+
+The v0 surface, all wired against the live devnet:
+
+| Command                        | Purpose                                                                          |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| `ligate info`                  | One-line chain-identity check; prints `chain_id`, `chain_hash`, and node version |
+| `ligate keys`                  | Generate, show, list, delete keypairs in the OS keystore                         |
+| `ligate balance`               | Query an address's token balance                                                 |
+| `ligate transfer`              | Build, sign, submit a `bank.transfer`                                            |
+| `ligate faucet`                | Request a drip against the public devnet faucet                                  |
+| `ligate register-schema`       | Register a new attestation schema                                                |
+| `ligate register-attestor-set` | Register a quorum of attestors for a schema                                      |
+| `ligate sign-attestation`      | Sign a payload digest                                                            |
+| `ligate submit-attestation`    | Put a signed attestation on-chain                                                |
+| `ligate query`                 | Generic RPC pass-through                                                         |
+| `ligate completions`           | Emit a shell completion script (bash, zsh, fish, powershell)                     |
+
+## Shell completions
+
+```bash
+# zsh (user-level)
+ligate completions zsh > ~/.local/share/zsh/site-functions/_ligate
+
+# bash (system-wide)
+ligate completions bash | sudo tee /etc/bash_completion.d/ligate
+
+# fish (user-level)
+ligate completions fish > ~/.config/fish/completions/ligate.fish
+
+# powershell — append to your $PROFILE
+ligate completions powershell >> $PROFILE
+```
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Source + per-command reference" icon="github" href="https://github.com/ligate-io/ligate-cli">
+    Full command surface, flag-by-flag, on GitHub.
+  </Card>
+
+<Card title="Browser / Node integrations" icon="js" href="/js">
+  JavaScript SDK for the same operations, browser- and Node-compatible.
+</Card>
+
+  <Card title="Running a full node" icon="server" href="/nodes">
+    Operator guide for ligate-node: requirements, Docker, stake + slashing.
+  </Card>
+</CardGroup>
