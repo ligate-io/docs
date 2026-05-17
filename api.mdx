@@ -1,0 +1,151 @@
+---
+title: 'HTTP API'
+sidebarTitle: 'HTTP API'
+description: 'Unified HTTP API at api.ligate.io. Faucet drip plus indexer queries (blocks, transactions, addresses, schemas, attestor sets). One Rust service backing the explorer at explorer.ligate.io.'
+---
+
+`api.ligate.io` is the unified HTTP service that hosts the faucet drip
+and the indexer queries. One Rust binary, one Postgres, deploys to
+Railway. Replaces the now-archived
+[`ligate-io/faucet`](https://github.com/ligate-io/faucet) and the
+Rust-side of [`ligate-io/ligate-explorer`](https://github.com/ligate-io/ligate-explorer).
+
+<Tip>
+  Use the HTTP API for **list / range / aggregation** queries. Point
+  lookups (one tx, one schema, one attestation, one balance) belong on
+  the [chain RPC](/rpc) at `rpc.ligate.io`. Source:
+  [github.com/ligate-io/ligate-api](https://github.com/ligate-io/ligate-api).
+</Tip>
+
+## v0 endpoint surface
+
+```
+GET  /v1/health               → 200 {"status":"ok"}
+GET  /v1/info                 → chain_id, chain_hash, version, latest_block, tx_per_second
+POST /v1/drip                 → body {address}, returns {tx_hash, amount_nano}
+GET  /v1/drip/status          → drip_amount, rate_limit_secs, addresses_dripped, faucet_address
+GET  /v1/blocks               → paginated list of latest blocks
+GET  /v1/blocks/{height}      → block detail
+GET  /v1/txs                  → paginated list of latest txs
+GET  /v1/txs/{hash}           → tx detail
+GET  /v1/addresses/{addr}     → balance + recent tx history
+GET  /v1/schemas              → list of registered schemas
+GET  /v1/schemas/{id}         → schema detail
+GET  /v1/attestor-sets/{id}   → attestor-set detail
+```
+
+<Warning>
+  In v0, only `/v1/drip*`, `/v1/health`, and `/v1/info` are fully
+  wired. Indexer query endpoints (`/v1/blocks*`, `/v1/txs*`,
+  `/v1/addresses/*`, `/v1/schemas*`, `/v1/attestor-sets/*`) currently
+  return `501 Not Implemented` with a tracking-issue link. They get
+  fleshed out across subsequent PRs as the indexer's Postgres schema
+  stabilises.
+</Warning>
+
+## Faucet drip
+
+The canonical devnet faucet endpoint. Hot-key signs a `bank.transfer`
+to the requesting address, rate-limited per-address.
+
+```bash
+# Claim a drip
+curl -X POST https://api.ligate.io/v1/drip \
+  -H 'content-type: application/json' \
+  -d '{"address":"lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b"}'
+# → {"tx_hash":"ltx1zd2qmly…","amount_nano":"100000000000"}
+
+# Check drip configuration
+curl https://api.ligate.io/v1/drip/status
+# → {
+#     "drip_amount": "100000000000",         // nano $LGT (= 100 $LGT)
+#     "rate_limit_secs": 86400,              // 24h cooldown per address
+#     "addresses_dripped": 1247,
+#     "faucet_address": "lig1zd9j2z6x55ydnv9m8f0pdw3vs2j8u0w5sdqeaf478dzp6s998ac"
+#   }
+```
+
+Rate-limited per recipient address; each address can drip once per
+window. Restart resets the in-memory window state (faucet ops don't
+restart mid-day under normal conditions).
+
+The CLI's `ligate faucet` currently calls the legacy hostname
+`faucet.ligate.io/faucet`. Both endpoints back the same primitive; the
+next CLI release switches to `api.ligate.io/v1/drip` directly.
+
+## Chain identity
+
+```bash
+curl https://api.ligate.io/v1/info
+# → {
+#     "chain_id": "ligate-devnet-1",
+#     "chain_hash": "abcd...",
+#     "version": "0.1.2",
+#     "latest_block": 1481207,
+#     "tx_per_second": 4.2
+#   }
+```
+
+Wraps the chain's `/v1/rollup/info` plus aggregated stats from the
+indexer.
+
+## Architecture
+
+```
+┌─────────────────────────┐    ┌─────────────────────────┐
+│  ligate-explorer        │    │  Themisra / Mneme       │
+│  (Next.js, Vercel)      │    │  (partner web apps)     │
+└────────────┬────────────┘    └────────────┬────────────┘
+             │                              │
+             │     api.ligate.io            │
+             ├──────────────────────────────┤
+             ▼                              ▼
+        ┌──────────────────────────────────┐
+        │    ligate-api (Rust, Railway)    │
+        │  ┌─────────┐ ┌────────────────┐  │
+        │  │  drip   │ │   indexer      │  │
+        │  │ /v1/drip│ │ task + queries │  │
+        │  └────┬────┘ └────┬───────────┘  │
+        │       │           │              │
+        └───────┼───────────┼──────────────┘
+                │           │
+                ▼           ▼
+       ┌──────────────┐  ┌────────────────┐
+       │  rpc.ligate  │  │   Postgres     │
+       │  .io (chain) │  │  (Railway)     │
+       └──────────────┘  └────────────────┘
+```
+
+Two deploy artifacts (one Rust binary, one Postgres), one domain,
+sub-millisecond chain-to-Postgres latency on Railway's internal
+network.
+
+## CORS
+
+Permissive CORS on every public endpoint
+(`tower_http::cors::CorsLayer::permissive()` on the axum router).
+Browsers from arbitrary origins (Mneme wallet, Themisra demo pages,
+partner web apps) can POST without preflight blocking. v0 devnet is
+"anyone can drip from any browser"; testnet+ tightens the origin
+allow-list.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Source + endpoint detail" icon="github" href="https://github.com/ligate-io/ligate-api">
+    Repository, including the Postgres migrations and the chain →
+    Postgres ingest task.
+  </Card>
+
+  <Card title="Chain RPC (point lookups)" icon="server" href="/rpc">
+    `rpc.ligate.io`. The 115 chain endpoints behind everything here.
+  </Card>
+
+  <Card title="TypeScript SDK" icon="js" href="/js">
+    `@ligate-labs/sdk` wraps both `api.ligate.io` and the chain RPC.
+  </Card>
+
+  <Card title="Block explorer" icon="cube" href="https://explorer.ligate.io">
+    Live block + transaction + attestation browser. Reads this API.
+  </Card>
+</CardGroup>

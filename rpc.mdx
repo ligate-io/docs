@@ -1,28 +1,277 @@
 ---
 title: 'Chain RPC'
 sidebarTitle: 'RPC'
-description: 'Direct REST surface exposed by every ligate-node. 115 endpoints under /v1/. Submit transactions, query ledger state, fetch chain identity, look up attestations and balances. OpenAPI 3 spec at /v1/openapi-v3.json.'
+description: 'Direct REST surface exposed by every ligate-node. 115 endpoints under /v1/. Submit transactions, query ledger state, fetch chain identity, look up attestations and balances. OpenAPI 3 at /v1/openapi-v3.json.'
 ---
 
-<Info>
-  This page is in active migration. Until then, every running node serves
-  Swagger UI at `/v1/swagger-ui` and the OpenAPI 3 spec at
-  `/v1/openapi-v3.json`. Source:
-  [github.com/ligate-io/ligate-chain](https://github.com/ligate-io/ligate-chain).
-</Info>
+Direct REST surface exposed by every `ligate-node`. **115 endpoints**
+under `/v1/`, all auto-discovered from the runtime composition by the
+Sovereign SDK. The chain's REST API is **point lookups only by design**,
+list, range, time-bucketed, by-submitter, aggregation, top-N, and
+search queries live in the [HTTP API](/api) (a separate service backed
+by Postgres), not on the chain.
 
-The chain's REST API is **point lookups only by design**. List, range,
-time-bucketed, by-submitter, aggregation, top-N, and search queries
-live in the indexer service, not on the chain.
+<Tip>
+  Every running node serves Swagger UI at `/v1/swagger-ui` and the
+  OpenAPI 3 spec at `/v1/openapi-v3.json`. If anything on this page
+  drifts from a running node, those two are the source of truth.
+</Tip>
 
-| Prefix              | Count | Purpose                                                |
-| ------------------- | ----- | ------------------------------------------------------ |
-| `/v1/ledger/...`    | 17    | Block, batch, transaction, event queries               |
-| `/v1/sequencer/...` | 6     | Transaction submission, sequencer status, mempool      |
-| `/v1/rollup/...`    | 7     | Chain identity, sync, gas price, schema, simulate      |
-| `/v1/modules/...`   | 85    | Per-module state and custom queries                    |
+## URL versioning policy
 
-Full reference and per-endpoint detail lands in the next migration pass.
-For now, the canonical reference is
-[`docs/protocol/rest-api.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/rest-api.md)
-in the chain repo.
+| Surface | Path | Versioned? |
+| ------- | ---- | ---------- |
+| Chain API (ledger / sequencer / rollup / modules / openapi spec) | `/v1/...` | yes |
+| Liveness probe | `/health` | no (always 200) |
+| Readiness probe | `/ready` | no |
+| Prometheus metrics | `:9100/metrics` (separate port) | no |
+
+Pre-public-devnet, breaking changes inside `/v1/` are coordinated
+between Ligate Labs and design partners. Post-public-devnet, breaking
+changes bump to `/v2/` and the previous version stays mounted for one
+chain-id-ladder rung.
+
+## Why point lookups only
+
+Three reasons (full detail in
+[`attestation-v0.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/attestation-v0.md#whats-deliberately-not-here)):
+
+1. The chain's data is keyed for verification, not search. A
+   `list_by_schema` query would scan the full attestations map on
+   every consensus node.
+2. Adding a secondary index is a hard fork.
+3. Range and aggregation queries have a better home in a service that
+   owns its own database.
+
+If a query can be answered with a single direct lookup against
+existing state, it lives on the chain. If it needs scanning, sorting,
+joining, or windowing, it lives in the [HTTP API](/api) indexer.
+
+## Connect
+
+The canonical public devnet endpoint:
+
+```bash
+# Chain identity
+curl https://rpc.ligate.io/v1/rollup/info
+
+# Sync status
+curl https://rpc.ligate.io/v1/rollup/sync-status
+
+# Live OpenAPI surface
+open https://rpc.ligate.io/v1/swagger-ui
+```
+
+Local dev (MockDa, run from the chain repo root):
+
+```bash
+cargo run --bin ligate-node
+# Binds REST to 127.0.0.1:12346 per devnet/rollup.toml
+curl http://127.0.0.1:12346/v1/rollup/info
+```
+
+## Top-level path map
+
+| Prefix              | Count | Purpose                                                          |
+| ------------------- | ----- | ---------------------------------------------------------------- |
+| `/v1/ledger/...`    | 17    | Block, batch, transaction, event queries                         |
+| `/v1/sequencer/...` | 6     | Transaction submission, sequencer status, mempool                |
+| `/v1/rollup/...`    | 7     | Chain identity, sync, gas price, dedup, schema, simulate         |
+| `/v1/modules/...`   | 85    | Per-module state and custom queries (auto-mounted + `HasCustomRestApi`) |
+
+The four module-related paths outside the per-module breakdown:
+
+- `GET /v1/modules`, list every mounted module
+- `GET /v1/modules/{moduleName}`, metadata for one mounted module
+- The remaining 83 are per-module endpoints
+
+Every path is `GET` unless explicitly marked `POST`.
+
+## 1. Ledger queries
+
+Mounted at `/v1/ledger/...`. 17 endpoints covering slots, batches,
+transactions, events, aggregated proofs.
+
+### Slots
+
+| Path                                                           | Returns                              |
+| -------------------------------------------------------------- | ------------------------------------ |
+| `GET /v1/ledger/slots/latest`                                  | The latest slot                      |
+| `GET /v1/ledger/slots/finalized`                               | The latest finalized slot            |
+| `GET /v1/ledger/slots/{slotId}`                                | A slot by id (height or hash)        |
+| `GET /v1/ledger/slots/{slotId}/events`                         | Events emitted in a slot             |
+| `GET /v1/ledger/slots/{slotId}/batches/{batchOffset}`          | Nth batch in the named slot          |
+| `GET /v1/ledger/slots/{slotId}/batches/{batchOffset}/txs/{txOffset}` | Mth tx of the Nth batch        |
+
+`{slotId}` accepts a height (e.g. `123`), a hash (`0x...`), or the
+literals `latest` and `finalized`.
+
+### Batches and transactions
+
+| Path                                              | Returns                  |
+| ------------------------------------------------- | ------------------------ |
+| `GET /v1/ledger/batches/{batchId}`                | A batch by id            |
+| `GET /v1/ledger/batches/{batchId}/txs/{txOffset}` | Mth tx of a batch        |
+| `GET /v1/ledger/txs/{txHash}`                     | Transaction by hash      |
+| `GET /v1/ledger/txs/{txHash}/events`              | Events from that tx      |
+
+### Events + aggregated proofs
+
+| Path                                                 | Returns                              |
+| ---------------------------------------------------- | ------------------------------------ |
+| `GET /v1/ledger/events`                              | Event stream (cursor-paginated)      |
+| `GET /v1/ledger/events/{eventNumber}`                | One event by global event number     |
+| `GET /v1/ledger/aggregated-proofs/latest`            | Latest aggregated proof              |
+| `GET /v1/ledger/aggregated-proofs/{proofId}`         | An aggregated proof by id            |
+
+## 2. Sequencer (transaction submission, mempool)
+
+Mounted at `/v1/sequencer/...`. 6 endpoints.
+
+| Path                                          | Method | Purpose                                                  |
+| --------------------------------------------- | ------ | -------------------------------------------------------- |
+| `/v1/sequencer/txs`                           | POST   | Submit a transaction (body is hex-encoded signed tx)     |
+| `/v1/sequencer/txs/{txHash}`                  | GET    | Look up a submitted transaction by hash                  |
+| `/v1/sequencer/txs/{txHash}/status`           | GET    | Inclusion status of a submitted transaction              |
+| `/v1/sequencer/ready`                         | GET    | 200 if ready, 503 with details if not                    |
+| `/v1/sequencer/unstable/events`               | GET    | Mempool / sequencer event stream. **Unstable.**          |
+| `/v1/sequencer/unstable/events/{eventOffset}` | GET    | One unstable event by offset                             |
+
+Submitting a transaction:
+
+```bash
+curl -X POST https://rpc.ligate.io/v1/sequencer/txs \
+  -H 'content-type: application/json' \
+  -d '{"body":"0xa1b2c3..."}'
+```
+
+The response is a tx hash (queue receipt, **not finality**). Poll
+`/v1/sequencer/txs/{txHash}/status` for sequencer-side status, or
+`/v1/ledger/txs/{txHash}` for ledger-side inclusion.
+
+The `/v1/sequencer/unstable/events` surface is unstable by design;
+production integrations should subscribe to `/v1/ledger/events` once a
+transaction lands on chain.
+
+## 3. Rollup meta
+
+Mounted at `/v1/rollup/...`. 7 endpoints. The first stop for any
+client.
+
+| Path                                                   | Method | Returns                                                                                          |
+| ------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------ |
+| `/v1/rollup/info`                                      | GET    | Chain identity: `chain_id`, `chain_hash` (hex, 64 chars), `version` (binary `CARGO_PKG_VERSION`) |
+| `/v1/rollup/sync-status`                               | GET    | Whether the node is caught up to the DA layer                                                    |
+| `/v1/rollup/base-fee-per-gas/latest`                   | GET    | Current per-gas base fee in `$LGT`                                                               |
+| `/v1/rollup/constants`                                 | GET    | Governance-tunable constants (current values)                                                    |
+| `/v1/rollup/schema`                                    | GET    | Universal-wallet TX schema, the typed Borsh layout of every `CallMessage` variant                |
+| `/v1/rollup/addresses/{credential_id}/dedup`           | GET    | Account dedup state for a given credential id                                                    |
+| `/v1/rollup/simulate`                                  | POST   | Dry-run a transaction, returns the result without committing state                               |
+
+`/v1/rollup/info` returns three identifiers with different roles:
+
+- **`chain_id`**, the wallet- and explorer-facing ladder string
+  (`ligate-localnet`, `ligate-devnet-1`, `ligate-testnet-N`,
+  `ligate-1`); bumps only on a state-breaking restart.
+- **`chain_hash`**, 32-byte build-time fingerprint of the runtime
+  composition; bumps on every STF change and pins the tx-signing
+  domain (replay protection).
+- **`version`**, the node binary's semver. Ops debugging only.
+
+Wallets and SDKs pin `chain_hash` on connect.
+
+```bash
+curl https://rpc.ligate.io/v1/rollup/info
+# {"chain_id":"ligate-devnet-1","chain_hash":"abcd...","version":"0.1.2"}
+```
+
+<Note>
+  `chain_hash` is critical for transaction signing. Every signature is
+  over `borsh(UnsignedTransaction) ++ chain_hash`. A signature for one
+  runtime won't replay on another.
+</Note>
+
+`/v1/rollup/schema` is **not** the OpenAPI document despite the name.
+It is the universal-wallet schema that wallets and SDKs consume to
+encode transactions in a forward-compatible way. The OpenAPI 3 spec is
+at `/v1/openapi-v3.json`.
+
+## 4. Modules (85 endpoints)
+
+Mounted at `/v1/modules/...`. Each Sovereign SDK module gets:
+
+- Auto-mounted state endpoints (one `GET` per `StateMap` / `StateValue`)
+- Custom routes the module declares via `HasCustomRestApi`
+
+### `attestation` module
+
+Mounted at `/v1/modules/attestation`. Three custom point-lookup routes
+plus 11 auto-mounted state endpoints.
+
+| Path                                                               | Returns                                                |
+| ------------------------------------------------------------------ | ------------------------------------------------------ |
+| `GET /v1/modules/attestation/schemas/{schemaId}`                   | One schema by Bech32m id (`lsc1...`)                   |
+| `GET /v1/modules/attestation/attestor-sets/{attestorSetId}`        | One attestor set by Bech32m id (`las1...`)             |
+| `GET /v1/modules/attestation/attestations/{schemaId}:{payloadHash}` | One attestation by compound id (schema + payload hash) |
+
+There is **no** `list_by_schema`, `list_by_submitter`, or similar.
+Those queries belong in the [HTTP API](/api) indexer.
+
+### `bank` module (`$LGT` and other tokens)
+
+Mounted at `/v1/modules/bank`. The two most useful endpoints:
+
+```bash
+# $LGT balance for an address
+curl https://rpc.ligate.io/v1/modules/bank/tokens/gas_token/balances/lig1...
+# { "data": { "amount": "100000000000", "tokenId": "..." } }
+
+# Total supply
+curl https://rpc.ligate.io/v1/modules/bank/tokens/{tokenId}/total-supply
+```
+
+`$LGT` uses **9 decimals** on the wire (smallest unit = 1 nano `$LGT`
+= `0.000000001 $LGT`). All API amounts are in base units (`u64`
+nanos).
+
+## WebSocket streams
+
+The chain exposes a small set of WebSocket subscriptions under
+`/v1/ledger/`. There is no single global `/ws` endpoint.
+
+| Path                                       | Stream                       |
+| ------------------------------------------ | ---------------------------- |
+| `/v1/ledger/slots/latest/ws`               | new slots as they arrive     |
+| `/v1/ledger/slots/finalized/ws`            | slots as they finalize       |
+| `/v1/ledger/slots/latest/events/ws`        | events from the head         |
+| `/v1/ledger/aggregated-proofs/latest/ws`   | new aggregated proofs        |
+
+```js
+const ws = new WebSocket(
+  'wss://rpc.ligate.io/v1/ledger/slots/latest/ws',
+)
+ws.onmessage = (e) => console.log(JSON.parse(e.data))
+```
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Full per-endpoint reference" icon="github" href="https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/rest-api.md">
+    `docs/protocol/rest-api.md` in the chain repo. All 115 endpoints,
+    per-module breakdown, response shapes.
+  </Card>
+
+  <Card title="OpenAPI spec on a live node" icon="file-code" href="https://rpc.ligate.io/v1/openapi-v3.json">
+    Machine-readable, always reflects the running runtime.
+  </Card>
+
+  <Card title="HTTP API (faucet + indexer)" icon="server" href="/api">
+    `api.ligate.io`. Faucet drip plus list / range / aggregation
+    queries.
+  </Card>
+
+  <Card title="TypeScript SDK" icon="js" href="/js">
+    `@ligate-labs/sdk` wraps everything above. Build, sign, submit,
+    query.
+  </Card>
+</CardGroup>
