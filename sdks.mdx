@@ -9,18 +9,22 @@ description: 'Client libraries for Ligate Chain. Python, TypeScript, Rust, and G
   reference today. Other language SDKs land in subsequent waves.
 </Info>
 
-| Language    | Package                                      | Status         |
-| ----------- | -------------------------------------------- | -------------- |
-| TypeScript  | `@ligate-labs/sdk@rc`                        | RC, live       |
-| Python      | `ligate-sdk`                                 | Planned        |
-| Rust        | `ligate-sdk` crate                           | Planned        |
-| Go          | `github.com/ligate-io/ligate-go`             | Planned        |
+| Language    | Package                                                        | Status         |
+| ----------- | -------------------------------------------------------------- | -------------- |
+| TypeScript  | [`@ligate-labs/sdk@rc`](https://www.npmjs.com/package/@ligate-labs/sdk) (currently `0.1.1-devnet`) | RC, live       |
+| Python      | `ligate-sdk`                                                   | Planned        |
+| Rust        | `ligate-sdk` crate                                             | Planned        |
+| Go          | `github.com/ligate-io/ligate-go`                               | Planned        |
 
-The TypeScript SDK is browser, Node, and edge-runtime compatible. Build,
-sign, submit, and wait for inclusion in one call.
+The TypeScript SDK is browser, Node, and edge-runtime compatible. Pure
+ESM, zero runtime dependencies on the chain repo (Borsh + Bech32m
+implemented locally).
 
 ```bash
+# devnet-aligned (rc dist-tag tracks the current ligate-devnet-1 wire format)
 pnpm add @ligate-labs/sdk@rc
+# or pin exactly
+pnpm add @ligate-labs/sdk@0.1.1-devnet
 ```
 
 Source:

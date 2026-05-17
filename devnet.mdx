@@ -21,11 +21,12 @@ for the Ligate devnet.
 | Network        | `ligate-devnet-1`                                                    |
 | Chain ID       | `ligate-devnet-1` (numeric: `4242`)                                  |
 | Status         | Live, Celestia Mocha-testnet                                         |
-| REST           | `https://rpc.devnet.ligate.io/v1/`                                   |
-| OpenAPI spec   | `https://rpc.devnet.ligate.io/v1/openapi-v3.json`                    |
-| Swagger UI     | `https://rpc.devnet.ligate.io/v1/swagger-ui`                         |
+| REST           | `https://rpc.ligate.io/v1/`                                   |
+| OpenAPI spec   | `https://rpc.ligate.io/v1/openapi-v3.json`                    |
+| Swagger UI     | `https://rpc.ligate.io/v1/swagger-ui`                         |
 | Explorer       | `https://explorer.ligate.io`                                         |
-| Faucet         | `https://faucet.ligate.io`, 100 `$LGT` per drip, 24h cooldown per address |
+| Faucet (HTTP)  | `POST https://api.ligate.io/v1/drip`, 100 `$LGT` per drip, 24h cooldown per address |
+| Faucet (CLI)   | `https://faucet.ligate.io/faucet` (legacy hostname, what the `ligate faucet` CLI calls by default) |
 | DA layer       | `celestia-mocha`                                                     |
 | Block time     | 1 second                                                             |
 | `$LGT` decimals | 9 (smallest unit: 1 nano `$LGT` = `0.000000001 $LGT`)               |
@@ -71,13 +72,18 @@ ligate keys generate --name alice
 ligate faucet $(ligate keys show alice)
 ```
 
-HTTP:
+HTTP (canonical endpoint, served by [`ligate-api`](https://github.com/ligate-io/ligate-api)):
 
 ```bash
-curl -X POST https://faucet.ligate.io/faucet \
+curl -X POST https://api.ligate.io/v1/drip \
   -H 'content-type: application/json' \
   -d '{"address":"lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b"}'
 ```
+
+The legacy hostname `https://faucet.ligate.io/faucet` (the original
+standalone `ligate-io/faucet` service, now archived) still resolves;
+the CLI's `ligate faucet` subcommand uses it by default until the next
+release switches to `api.ligate.io/v1/drip`.
 
 Rate limits are per recipient address. If you're an operator or
 node-runner and need more, email
@@ -85,7 +91,7 @@ node-runner and need more, email
 
 ## Service endpoints
 
-### Chain REST (`rpc.devnet.ligate.io`)
+### Chain REST (`rpc.ligate.io`)
 
 115 endpoints under `/v1/`, all auto-discovered from the runtime
 composition. Point lookups only by design. See [Chain RPC](/rpc) for
@@ -108,7 +114,7 @@ streams:
 Example:
 
 ```js
-const ws = new WebSocket('wss://rpc.devnet.ligate.io/v1/ledger/slots/latest/ws')
+const ws = new WebSocket('wss://rpc.ligate.io/v1/ledger/slots/latest/ws')
 ws.onmessage = (e) => console.log(JSON.parse(e.data))
 ```
 

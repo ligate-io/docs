@@ -15,18 +15,35 @@ pnpm add @ligate-labs/sdk@rc
 ```
 
 ```ts
-import { Ligate } from '@ligate-labs/sdk'
+import {
+  generateKeypair,
+  LigateClient,
+  submitTransfer,
+} from '@ligate-labs/sdk'
 
-const ligate = new Ligate({ rpc: 'https://rpc.devnet.ligate.io' })
+// Generate (or load) a key. Returns { address, publicKey, privateKey }.
+const sender = generateKeypair()
+console.log('address:', sender.address)
 
-const tx = await ligate.submitAttestation({
-  schemaId: 'lsc1f8a2c…',
-  payloadHash: 'lph1c3a87e…',
-  attestorSig: '<BLS aggregate>',
+// Connect a client at the canonical devnet RPC.
+const client = new LigateClient({ rpc: 'https://rpc.ligate.io' })
+
+// Build, sign, submit a 1 LGT transfer to a recipient.
+const result = await submitTransfer(client, {
+  signer: sender,
+  to: 'lig1u8z2rxh6ymjwkqsasme64f5kfphtfm2kf4kkn0clusfpr34amezsp5j7yp',
+  amount: 1_000_000_000n, // nano LGT (9 decimals): 1 LGT
 })
 
-await tx.waitForInclusion()
+console.log('tx hash:', result.txHash)
 ```
+
+Runnable examples (transfer, balance polling, key generation) live in
+[`examples/`](https://github.com/ligate-io/ligate-js/tree/main/examples)
+of the SDK repo. The current attestation-building surface is being
+finalised under the same package; see
+[github.com/ligate-io/ligate-js](https://github.com/ligate-io/ligate-js)
+for what's exported today vs in flight.
 
 See [the chain RPC reference](/rpc) for the underlying surface this
 wraps.

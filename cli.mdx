@@ -9,8 +9,9 @@ faucet, transfer $LGT, register schemas, and submit attestations against
 `ligate-devnet-1`. Written in Rust, no JS runtime required.
 
 <Tip>
-  Wires up against `ligate-devnet-1` out of the box. Latest release:
-  [`v0.1.0-devnet`](https://github.com/ligate-io/ligate-cli/releases/tag/v0.1.0-devnet).
+  Wires up against `ligate-devnet-1` out of the box. Default RPC:
+  `https://rpc.ligate.io`. Latest release:
+  [`v0.1.2-devnet`](https://github.com/ligate-io/ligate-cli/releases/latest).
 </Tip>
 
 ## Install
@@ -21,14 +22,14 @@ thirty seconds.
 
 ### 1. Pre-built tarball
 
-Each tagged release attaches platform tarballs for `linux-x86_64`,
-`linux-arm64`, `darwin-arm64`, and `darwin-amd64`, each with a SHA-256
-sidecar.
+Each tagged release attaches platform tarballs for `linux-amd64`,
+`linux-arm64`, and `darwin-arm64`, each with a SHA-256 sidecar. Intel Mac
+(`darwin-amd64`) is not pre-built, fall back to `cargo install` below.
 
 ```bash
-# Pick PLATFORM = linux-amd64 | linux-arm64 | darwin-arm64 | darwin-amd64
+# Pick PLATFORM = linux-amd64 | linux-arm64 | darwin-arm64
 curl -L -o ligate.tar.gz \
-  https://github.com/ligate-io/ligate-cli/releases/download/v0.1.0-devnet/ligate-v0.1.0-devnet-PLATFORM.tar.gz
+  https://github.com/ligate-io/ligate-cli/releases/latest/download/ligate-PLATFORM.tar.gz
 tar -xzf ligate.tar.gz
 sudo mv ligate /usr/local/bin/
 ligate --help
@@ -68,19 +69,21 @@ ligate faucet $(ligate keys show alice)
 # Check the balance arrived
 ligate balance $(ligate keys show alice) --token-id <hex>
 
-# Send some $LGT to another address
+# Send some $LGT to another address. Use the devnet chain_id (4242)
+# or set LIGATE_CHAIN_ID once. Get chain_hash from `ligate info --json`.
 ligate transfer \
-    --to lig1xyz...                    \
-    --amount 0.5                       \
-    --signer alice                     \
-    --chain-id 1                       \
-    --chain-hash <64-char-hex>         \
-    --token-id <64-char-hex>
+    --to lig1xyz...                                                       \
+    --amount 0.5                                                          \
+    --signer alice                                                        \
+    --chain-id 4242                                                       \
+    --chain-hash $(ligate info --json | jq -r .chain_hash)                \
+    --token-id token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
 ```
 
-Every chain-identity flag also accepts an env var: `LIGATE_RPC`,
-`LIGATE_CHAIN_ID`, `LIGATE_CHAIN_HASH`, `LIGATE_LGT_TOKEN_ID`. Set them once
-in your shell and the flags become optional.
+Every chain-identity flag also accepts an env var: `LIGATE_RPC` (default
+`https://rpc.ligate.io`), `LIGATE_CHAIN_ID`, `LIGATE_CHAIN_HASH`,
+`LIGATE_LGT_TOKEN_ID`, `LIGATE_FAUCET_URL`. Set them once in your shell
+and the flags become optional.
 
 ## Commands
 

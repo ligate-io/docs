@@ -27,26 +27,41 @@ Its core primitive is a generic, permissionless attestation protocol.
 
 ## Modules
 
-The chain is organised as Sovereign SDK modules. v0 ships with exactly one
-application module; others are planned.
+The chain is organised as Sovereign SDK modules. v0 ships with one
+Ligate-native module plus the SDK base modules carried for free.
 
 ### Shipping at v0
 
-- **`attestation`**, schemas, attestor sets, write-once attestations. See
-  [Proof of Prompt](/proof-of-prompt) for the canonical consumer.
+- **`attestation`** (Ligate-native), schemas, attestor sets, write-once
+  attestations. See [Proof of Prompt](/proof-of-prompt) for the canonical
+  consumer.
+- **SDK base modules** carried from the Sovereign SDK: `bank`,
+  `accounts`, `chain_state`, `sequencer_registry`, `attester_incentives`,
+  `prover_incentives`, `operator_incentives`. Same shape as the SDK demo
+  runtime; transfers, accounts, and incentive accounting work out of
+  the box.
 
 ### Planned (v1)
 
-- **`identity`**, DID-like lookups, verified tags, metadata URIs
-- **`disputes`**, on-chain flagging + attestor slashing tied to AttestorSet
-  stake
+Tracked in
+[`docs/protocol/upgrades.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/upgrades.md):
 
-### Planned (v2)
+- **`governance`** ([#41](https://github.com/ligate-io/ligate-chain/issues/41)),
+  on-chain proposals + voting + execution for parameter changes (fees,
+  `max_builder_bps`, treasury address)
+- **`upgrade`** ([#42](https://github.com/ligate-io/ligate-chain/issues/42)),
+  coordinated runtime swaps at scheduled block heights (Cosmos SDK
+  `x/upgrade` semantics)
+- **`disputes`** ([#51](https://github.com/ligate-io/ligate-chain/issues/51)),
+  on-chain flagging and attestor slashing tied to AttestorSet stake
 
-- **`payments`**, metered billing and streaming on top of `bank`
-- **`agents`**, on-chain agent wallets with allowlists, rate limits, and
-  delegation
-- Proof-carrying schemas (zkML / TEE proof hashes in attestation payloads)
+### Future-reserved
+
+- **`nft`** and **`tokens`** modules, prefixes (`lcc1...`, `ltk1...`)
+  reserved in the address ladder, modules ship when product surface
+  demands them
+- Proof-carrying schemas (zkML / TEE proof hashes in attestation
+  payloads), tracked under design research; not yet scheduled
 
 ## State layout (attestation module)
 
