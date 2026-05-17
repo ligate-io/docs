@@ -53,7 +53,7 @@
           },
           {
             "group": "Reference",
-            "pages": ["rpc", "api", "glossary"]
+            "pages": ["rpc", "api", "glossary", "errors"]
           },
           {
             "group": "Operators",

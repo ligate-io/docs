@@ -49,15 +49,17 @@ Until Mneme ships, the same operations work via the
 # Generate a keypair (OS keystore, mode 0600)
 ligate keys generate --name alice
 
+# One-time env setup
+export LIGATE_CHAIN_ID=4242
+export LIGATE_CHAIN_HASH=$(ligate info --json | jq -r .chain_hash)
+export LIGATE_LGT_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
+
 # Sign and submit a $LGT transfer
 ligate transfer --to lig1... --amount 0.5 --signer alice
 
-# Build, sign, submit a themisra.proof-of-prompt attestation
-ligate attest \
-  --schema themisra.proof-of-prompt/v1 \
-  --model-id "anthropic/claude-opus:4.7" \
-  --prompt "..." --response ./response.md \
-  --signer alice
+# Themisra attestation: register-attestor-set + register-schema (one-time)
+# then sign-attestation (per attestor) + submit-attestation (any signer).
+# See /cli and /themisra/api for the full flow.
 ```
 
 ```ts
@@ -86,7 +88,7 @@ Themisra, Iris, and partner schemas integrate the same way.
 
 <CardGroup cols={2}>
   <Card title="CLI (today's wallet surface)" icon="terminal" href="/cli">
-    `ligate keys`, `ligate transfer`, `ligate attest` cover everything Mneme will.
+    `ligate keys`, `ligate transfer`, plus the attestation suite, cover everything Mneme will.
   </Card>
 
   <Card title="JavaScript SDK" icon="js" href="/js">

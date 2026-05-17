@@ -145,15 +145,19 @@ ligate register-attestor-set \
   --signer alice
 # → returns las1... id
 
-# 2. Register your schema bound to it
-ligate register-schema \
-  --name myorg.proof-of-prompt \
-  --version 1 \
-  --attestor-set las1... \
-  --fee-routing-bps 5000 \
-  --fee-routing-addr lig1... \
-  --payload-spec-hash <32-byte hex sha256 of the JSON-Schema> \
-  --signer alice
+# 2. Register your schema bound to it. The CLI takes a JSON file:
+cat > my-schema.json <<EOF
+{
+  "name": "myorg.proof-of-prompt",
+  "version": 1,
+  "attestor_set_id": "las1...",
+  "fee_routing_bps": 5000,
+  "fee_routing_addr": "lig1...",
+  "payload_spec_hash": "<32-byte hex sha256 of the JSON-Schema>"
+}
+EOF
+
+ligate register-schema --file my-schema.json --signer alice
 # → returns lsc1... id
 ```
 
@@ -203,7 +207,7 @@ id, schema id, and submitter. Until that ships, poll
   </Card>
 
   <Card title="CLI attestation commands" icon="terminal" href="/cli">
-    `ligate attest`, `ligate register-schema`, `ligate register-attestor-set`.
+    `ligate sign-attestation`, `ligate submit-attestation`, `ligate register-schema`, `ligate register-attestor-set`.
   </Card>
 </CardGroup>
 
