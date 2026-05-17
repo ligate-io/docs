@@ -84,7 +84,7 @@ relayer that sit on top, and the read / write paths for both.
 The split is intentional and matters for choosing which one your
 client calls.
 
-### `rpc.ligate.io` — chain REST (verification truth)
+### `rpc.ligate.io` · chain REST (verification truth)
 
 The chain node's own REST API. Point lookups by id. **115
 endpoints**, all under `/v1/`, auto-discovered from the runtime
@@ -105,7 +105,7 @@ Use when you need: chain identity, balances, point lookups by id,
 transaction submission, real-time event subscriptions. See
 [Chain RPC reference](/rpc).
 
-### `api.ligate.io` — HTTP API (operational queries)
+### `api.ligate.io` · HTTP API (operational queries)
 
 A separate Rust service backed by Postgres. The indexer task
 ingests chain state and exposes paginated / cursored / stats /
