@@ -1,0 +1,282 @@
+---
+title: 'Your first attestation, end-to-end'
+sidebarTitle: 'First attestation'
+description: 'Full walkthrough: provision a key, register your own attestor set, register a schema, sign a payload, submit a threshold-signed attestation, verify it. Single-machine flow using ligate CLI against ligate-devnet-1.'
+---
+
+A complete walkthrough from a fresh keypair to a verified
+attestation on `ligate-devnet-1`. Single-machine flow using a 1-of-1
+attestor set so you don't need to coordinate with anyone. ~10
+minutes including faucet drip.
+
+<Tip>
+  Real Themisra attestations use a 3-of-? federated quorum (you sign
+  alongside the canonical Themisra attestors). For that flow, see
+  [Themisra integration](/themisra/api). This tutorial uses a
+  self-owned 1-of-1 set so you can run every step locally.
+</Tip>
+
+## Prerequisites
+
+- [`ligate` CLI](/cli) installed and on PATH
+- A shell that can pipe + `jq` for the env setup
+
+```bash
+ligate --version
+# ligate-cli 0.1.x-devnet
+
+jq --version
+# jq-1.x
+```
+
+## Step 1: Set up environment
+
+The CLI defaults `--rpc` to `https://rpc.ligate.io`. The chain
+identity flags are required for every tx-submitting command;
+exporting them once is much less noisy than passing them on every
+call.
+
+```bash
+export LIGATE_RPC=https://rpc.ligate.io
+export LIGATE_CHAIN_ID=4242
+export LIGATE_CHAIN_HASH=$(ligate info --json | jq -r .chain_hash)
+export LIGATE_LGT_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
+
+# Verify
+ligate info
+# chain_id    ligate-devnet-1
+# chain_hash  abcd...
+# version     0.1.2
+```
+
+## Step 2: Generate a keypair
+
+```bash
+ligate keys generate --name alice
+# Writes <keystore>/alice.key (mode 0600) and <keystore>/alice.address
+
+# Note the address; we'll need it as the submitter
+ALICE=$(ligate keys show alice)
+echo $ALICE
+# lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b
+
+# And the pubkey, for the attestor-set member list
+ALICE_PK=$(ligate keys show alice --pubkey)
+echo $ALICE_PK
+# lpk1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b
+```
+
+## Step 3: Claim from the faucet
+
+You need `$LGT` to pay registration fees (10 LGT for the attestor
+set + 100 LGT for the schema + the per-attestation 0.001 LGT).
+
+```bash
+ligate faucet $ALICE
+# ✓ drip sent
+#   tx ltx1zd2qmly…ljgth4
+#   amount 100 $LGT
+
+# Verify
+ligate balance $ALICE --json
+# {
+#   "address": "lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b",
+#   "token_id": "token_1nyl...",
+#   "amount_nano": 100000000000,
+#   "amount_lgt": 100.0
+# }
+```
+
+100 LGT covers our registration + a few attestations comfortably.
+
+## Step 4: Register a 1-of-1 attestor set
+
+Alice's pubkey is the only member; threshold is 1. The chain id for
+the attestor set is derived from `(sorted_members, threshold)`, so
+re-registering with the same args is a no-op (returns the existing
+`las1...`).
+
+```bash
+ligate register-attestor-set \
+  --members $ALICE_PK \
+  --threshold 1 \
+  --signer alice
+# ✓ attestor set registered
+#   las1f8a2c4r9k1b...
+#   threshold 1-of-1
+#   tx ltx1...
+
+ATTESTOR_SET=$(ligate register-attestor-set \
+  --members $ALICE_PK \
+  --threshold 1 \
+  --signer alice \
+  --json | jq -r .attestor_set_id)
+echo $ATTESTOR_SET
+```
+
+## Step 5: Register a schema
+
+Schemas are defined as JSON files. Minimum required fields:
+
+```bash
+cat > my-schema.json <<EOF
+{
+  "name": "alice.tutorial-attestation",
+  "version": 1,
+  "attestor_set_id": "$ATTESTOR_SET",
+  "fee_routing_bps": 0,
+  "payload_spec_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+}
+EOF
+```
+
+- `name`: free-form, namespaced by your address. Two registrants can
+  both have `name = "tutorial-attestation"`, but the schema ids will
+  differ.
+- `version`: bumping creates a new schema (different `lsc1...`).
+  Use this to rotate to a new attestor set or payload spec.
+- `fee_routing_bps`: 0 = 100% to treasury. Set up to 5000 (50%) to
+  route to a builder address (then also set `fee_routing_addr`).
+- `payload_spec_hash`: 32-byte hex SHA-256 of the canonical
+  JSON-Schema that defines your payload. Placeholder zeros are fine
+  for this tutorial; in production, point at a real spec.
+
+Register:
+
+```bash
+SCHEMA=$(ligate register-schema --file my-schema.json --signer alice --json | jq -r .schema_id)
+echo $SCHEMA
+# lsc1c3a87e...
+```
+
+## Step 6: Hash your payload
+
+The canonical payload bytes are whatever your schema defines. For
+this tutorial, any byte string works.
+
+```bash
+echo -n '{"hello":"world","timestamp":1747443200}' > payload.bin
+PAYLOAD_HEX=$(sha256sum payload.bin | awk '{print $1}')
+echo $PAYLOAD_HEX
+# 0c8fdfe3f1d54a4e5d3c8b9a0e7f6c5b4a3e2d1c0b9a8f7e6d5c4b3a2918070605
+```
+
+You'll pass the hex form to `sign-attestation` and `submit-attestation`;
+the chain stores it as bech32m `lph1...`.
+
+## Step 7: Sign
+
+```bash
+ligate sign-attestation \
+  --schema $SCHEMA \
+  --payload-file payload.bin \
+  --submitter $ALICE \
+  --signer alice \
+  > signatures.json
+
+cat signatures.json
+# {
+#   "schema_id": "lsc1c3a87e...",
+#   "payload_hash": "lph1...",
+#   "submitter": "lig1qxk7r4z9...",
+#   "timestamp": 1747443200,
+#   "attestor_signature": {
+#     "pubkey": "lpk1qxk7r4z9...",
+#     "sig": "<128 hex chars>"
+#   }
+# }
+```
+
+The signature is over the canonical `SignedAttestationPayload`
+(`schema_id ‖ payload_hash ‖ submitter ‖ timestamp`).
+
+For a multi-attestor schema, you'd repeat step 7 on each attestor's
+machine and concatenate the outputs into a single signatures file
+before submitting.
+
+## Step 8: Submit
+
+```bash
+ligate submit-attestation \
+  --schema $SCHEMA \
+  --payload-hash <bech32m form of $PAYLOAD_HEX> \
+  --signatures signatures.json \
+  --signer alice
+# ✓ attestation submitted
+#   lat1c3a87e…fd9a7c
+#   tx ltx1...
+```
+
+The chain validates:
+
+1. Schema exists at `$SCHEMA`
+2. Each signature's pubkey is in the schema's AttestorSet members
+3. Each signature is a valid ed25519 sig over the canonical digest
+4. Count of valid sigs `>= attestor_set.threshold`
+
+If any of those fail, the tx is rejected with one of the
+[error variants](/errors#attestation-submission).
+
+## Step 9: Verify
+
+```bash
+# Read the attestation back from the chain
+ligate query attestation $SCHEMA:lph1...
+# {
+#   "schema_id": "lsc1...",
+#   "payload_hash": "lph1...",
+#   "submitter": "lig1qxk7r4z9...",
+#   "timestamp": 1747443200,
+#   "signatures": [
+#     {"pubkey": "lpk1...", "sig": "..."}
+#   ]
+# }
+```
+
+Three independent verification checks. The CLI's `query attestation`
+performs check 1 (on-chain existence). For the full check, you'd
+also:
+
+2. Recompute `payload_hash` from your local `payload.bin` and
+   compare. `sha256sum payload.bin` should match the chain's
+   `payload_hash` (after hex ↔ bech32m conversion).
+3. Recompute each signature over `SignedAttestationPayload`
+   (`schema_id ‖ payload_hash ‖ submitter ‖ timestamp`) using each
+   signer's pubkey from the schema's AttestorSet. The
+   [JS SDK](/js)'s `signAttestation` + `verify` cover this.
+
+## What you just did
+
+```
+Step 4: SchemaId = hash(owner, name, version)          (one-time)
+Step 4: AttestorSetId = hash(sorted_members, threshold) (one-time)
+Step 6: payload_hash = sha256(canonical_payload_bytes)
+Step 7: sig = ed25519_sign(privkey, SignedAttestationPayload(...))
+Step 8: chain stores Attestation(schema, payload_hash, submitter, timestamp, [sig])
+        keyed by (schema_id, payload_hash) – write-once
+```
+
+The chain holds the verifiable record; the off-chain `payload.bin`
+holds the plaintext. Anyone who has both can independently verify
+the attestation without trusting Ligate Labs, the attestors, or
+each other.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Themisra integration" icon="signature" href="/themisra/api">
+    Real Themisra attestations against the canonical federated quorum.
+  </Card>
+
+  <Card title="JS SDK" icon="js" href="/js">
+    Same flow programmatically from a Node service or browser app.
+  </Card>
+
+  <Card title="CLI reference" icon="terminal" href="/cli">
+    Every flag for every command.
+  </Card>
+
+  <Card title="Errors + troubleshooting" icon="triangle-exclamation" href="/errors">
+    Common failure modes for each step.
+  </Card>
+</CardGroup>
