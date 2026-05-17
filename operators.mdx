@@ -1,0 +1,136 @@
+---
+title: 'Operations'
+sidebarTitle: 'Operators'
+description: 'Operations runbooks for Ligate nodes: backup + restore, key rotation, Celestia light node, log shipping, alerts. Multi-node deploys and ongoing care.'
+---
+
+Once your node is
+[running](/nodes), the day-to-day is operations: backups, key
+rotations, alert response, log shipping, planned chain-id bumps. The
+canonical runbooks live in
+[`ligate-chain/docs/development/runbooks/`](https://github.com/ligate-io/ligate-chain/tree/main/docs/development/runbooks).
+This page indexes them.
+
+<Tip>
+  Each runbook is written for a specific operator decision. If a
+  procedure on this page conflicts with what's in the linked
+  runbook, **the runbook wins** — it ships in the chain repo and is
+  versioned with the code.
+</Tip>
+
+## Backup and restore
+
+[`backup-restore.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/runbooks/backup-restore.md)
+
+Hourly + daily + weekly RocksDB snapshots via `backup-rocksdb.sh`.
+Rotation: last 24 hourly + 7 daily + 4 weekly. Each local snapshot
+is currently ~5 GB (sparse RocksDB inflated by rsync; `--sparse`
+flag in the script would cut ~4x). Steady-state worst case ~120 GB
+of local snapshots on the sequencer; mirror to GCS for off-site.
+
+## Celestia light node
+
+[`celestia-light-node.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/runbooks/celestia-light-node.md)
+
+Co-located Celestia light node setup. Mocha testnet for devnet,
+Mainnet beta for mainnet. Default ports: RPC `26658`, gRPC `9090`.
+The `ligate-node` process points at these via
+`SOV_CELESTIA_RPC_URL` + `SOV_CELESTIA_GRPC_URL` env vars.
+
+## Sequencer key rotation
+
+[`sequencer-key-rotation.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/runbooks/sequencer-key-rotation.md)
+
+Rotate the sequencer's ed25519 keypair without a hard fork. Two-step:
+register the new key in `sequencer_registry`, wait one slot, retire
+the old one. Pre-mainnet this is coordinated with Ligate Labs over
+chat.
+
+## DA signer rotation
+
+[`da-signer-rotation.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/runbooks/da-signer-rotation.md)
+
+Rotate the Celestia signer key that pays for blob posts. Lives in
+the operator's secret store (`pass`, Vault, 1Password, etc.), not in
+the chain config. Rotation is a top-up + re-fund flow on the
+Celestia side, not a chain transaction.
+
+## Chain id bump (hard fork)
+
+[`chain-id-bump.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/runbooks/chain-id-bump.md)
+
+T-7d through T+24h sequence for moving `ligate-devnet-N` →
+`ligate-devnet-(N+1)`. Coordinated halt, genesis swap, fresh-start
+boot. The same runbook is used for `ligate-testnet-N` → `+1` and the
+eventual `ligate-1` → `2` if ever needed post-mainnet.
+
+## Faucet ops
+
+[`faucet-ops.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/runbooks/faucet-ops.md)
+
+Operational layer for the devnet faucet. Drip budget top-ups, signer
+rotation, rate-limit tuning, on-call playbook. The faucet service
+implementation now lives in
+[`ligate-io/ligate-api`](https://github.com/ligate-io/ligate-api)
+under the `drip` crate (`/v1/drip` endpoint).
+
+## Log shipping
+
+[`log-shipping.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/runbooks/log-shipping.md)
+
+`ligate-node` emits JSON-structured logs to stdout. Standard pipeline:
+journald → Vector → Loki / Grafana Cloud. Includes label conventions
+and parsing rules.
+
+## Mocha smoke
+
+[`mocha-smoke.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/runbooks/mocha-smoke.md)
+
+Hourly smoke test against Celestia Mocha. Boots a node against the
+public mocha endpoints, runs through a transfer + attestation cycle,
+asserts liveness. Catches Celestia-side regressions before they hit
+production.
+
+## Alerts
+
+[`alerts/`](https://github.com/ligate-io/ligate-chain/tree/main/docs/development/runbooks/alerts)
+
+PromQL alert definitions for `ligate-node` and the co-located
+Celestia light node. Slack-routed by default; severity tiers tied to
+on-call.
+
+## Cost monitoring
+
+[`cost-monitoring.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/cost-monitoring.md)
+
+GCP cost dashboard configuration. Lines for: sequencer VM, follower
+VM(s), persistent data disks, egress (DA posts to Celestia, REST to
+partners), GCS snapshot storage. Pre-mainnet expectation: ~135 USD /
+month sequencer, ~30 USD / month per follower.
+
+## Error coverage + genesis determinism
+
+Two reference docs that aren't runbooks but matter:
+
+- [`error-coverage.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/error-coverage.md) — every error variant the node can emit, with operator-facing remediation hints
+- [`genesis-determinism.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/genesis-determinism.md) — why two operators booting from the same `genesis/` produce byte-identical state roots, and how the CI guard enforces it
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Run your first node" icon="server" href="/nodes">
+    Hardware, install, configure, boot, verify.
+  </Card>
+
+  <Card title="Public devnet deploy" icon="cloud" href="https://github.com/ligate-io/ligate-chain/blob/main/docs/development/public-devnet-deploy.md">
+    GCP-specific end-to-end deploy runbook.
+  </Card>
+
+  <Card title="All runbooks" icon="book" href="https://github.com/ligate-io/ligate-chain/tree/main/docs/development/runbooks">
+    Browse the runbooks/ directory on GitHub.
+  </Card>
+
+  <Card title="Validators (post-mainnet)" icon="shield-check" href="/validators">
+    PoUA validator role activates at v3 mainnet genesis.
+  </Card>
+</CardGroup>
