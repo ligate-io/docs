@@ -64,11 +64,7 @@ Run + fund:
 ```bash
 pnpm tsx keypair-gen.ts > /dev/null
 SERVICE_ADDR=$(jq -r .address service-key.json)
-# `ligate faucet` is currently broken (default URL dead). Use the HTTP
-# endpoint until the next CLI release.
-curl -X POST https://api.ligate.io/v1/drip \
-  -H 'content-type: application/json' \
-  -d "{\"address\":\"$SERVICE_ADDR\"}"
+ligate faucet $SERVICE_ADDR
 ```
 
 ## Step 3: Build a payload + submit attestation

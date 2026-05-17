@@ -72,12 +72,9 @@ You need `$LGT` to pay registration fees (10 LGT for the attestor
 set + 100 LGT for the schema + the per-attestation 0.001 LGT).
 
 ```bash
-# `ligate faucet` is currently broken (default URL dead). Use the HTTP
-# endpoint directly; the CLI fix lands in the next release.
-curl -X POST https://api.ligate.io/v1/drip \
-  -H 'content-type: application/json' \
-  -d "{\"address\":\"$ALICE\"}"
-# → {"tx_hash":"ltx1zd2qmly…","amount_nano":"100000000000"}
+ligate faucet $ALICE
+# ✓ drip: 100 $LGT (100000000000 nano)
+#   tx:      ltx1zd2qmly…ljgth4
 
 # Verify
 ligate balance $ALICE --json
