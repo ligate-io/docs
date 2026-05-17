@@ -198,12 +198,15 @@ before submitting.
 ```bash
 ligate submit-attestation \
   --schema $SCHEMA \
-  --payload-hash <bech32m form of $PAYLOAD_HEX> \
+  --payload-hash lph1... \
   --signatures signatures.json \
   --signer alice
 # ✓ attestation submitted
-#   lat1c3a87e…fd9a7c
+#   lat1c3a87e...fd9a7c
 #   tx ltx1...
+
+# Capture the printed lat1... for the next step.
+ATTID=lat1c3a87e...fd9a7c
 ```
 
 The chain validates:
@@ -220,7 +223,7 @@ If any of those fail, the tx is rejected with one of the
 
 ```bash
 # Read the attestation back from the chain
-ligate query attestation $SCHEMA:lph1...
+ligate query attestation $ATTID
 # {
 #   "schema_id": "lsc1...",
 #   "payload_hash": "lph1...",
@@ -238,7 +241,7 @@ also:
 
 2. Recompute `payload_hash` from your local `payload.bin` and
    compare. `sha256sum payload.bin` should match the chain's
-   `payload_hash` (after hex ↔ bech32m conversion).
+   `payload_hash` (after hex to bech32m conversion).
 3. Recompute each signature over `SignedAttestationPayload`
    (`schema_id ‖ payload_hash ‖ submitter ‖ timestamp`) using each
    signer's pubkey from the schema's AttestorSet. The

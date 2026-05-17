@@ -168,8 +168,9 @@ can't be re-submitted.
 
 **Fix:** This usually means the prior submission landed and you're
 seeing it from a retry. Verify with
-`ligate query attestation lsc1...:lph1...`. If the existing record
-is what you wanted, you're done.
+`ligate query attestation lat1...` using the AttestationId from the
+prior `submit-attestation` output. If the existing record is what
+you wanted, you're done.
 
 ### `quorum not met: N valid signatures, need M`
 

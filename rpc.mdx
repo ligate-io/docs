@@ -212,7 +212,7 @@ plus 11 auto-mounted state endpoints.
 | ------------------------------------------------------------------ | ------------------------------------------------------ |
 | `GET /v1/modules/attestation/schemas/{schemaId}`                   | One schema by Bech32m id (`lsc1...`)                   |
 | `GET /v1/modules/attestation/attestor-sets/{attestorSetId}`        | One attestor set by Bech32m id (`las1...`)             |
-| `GET /v1/modules/attestation/attestations/{schemaId}:{payloadHash}` | One attestation by compound id (schema + payload hash) |
+| `GET /v1/modules/attestation/attestations/{attestationId}`         | One attestation by bech32m id (`lat1...`)              |
 
 There is **no** `list_by_schema`, `list_by_submitter`, or similar.
 Those queries belong in the [HTTP API](/api) indexer.
