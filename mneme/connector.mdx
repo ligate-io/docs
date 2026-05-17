@@ -1,0 +1,184 @@
+---
+title: 'Mneme dApp connector'
+sidebarTitle: 'dApp connector'
+description: 'EIP-1193-style provider API for Mneme. Themisra, Iris, and partner web apps call window.mneme.request(...) for account access, signing, and tx submission. JSON-RPC method surface and event semantics.'
+---
+
+The dApp connector is the API Mneme exposes to web apps that need
+the user's wallet. Same shape as EVM wallet providers (EIP-1193),
+namespaced under `window.mneme` so it coexists cleanly with
+MetaMask or other browser wallets.
+
+<Warning>
+  **Planned, ships with Mneme v1.** The API below is the design spec.
+  Today, web apps integrate via the [JS SDK](/js) with the user
+  pasting in a private key, or via OAuth-style sign-in flows in
+  partner apps.
+</Warning>
+
+## Detect + connect
+
+```ts
+if (typeof window.mneme !== 'undefined') {
+  // Mneme is installed
+  const accounts = await window.mneme.request({
+    method: 'mneme_requestAccounts',
+  })
+  console.log('connected as:', accounts[0]) // lig1...
+}
+```
+
+`mneme_requestAccounts` prompts the user with a connect dialog
+showing the calling origin + the requested permissions. After
+approval, subsequent calls in the same session are silent.
+
+## JSON-RPC method surface
+
+All methods follow the `provider.request({method, params})` pattern.
+Return types are JSON-serializable.
+
+### Account methods
+
+| Method                   | Params           | Returns                              |
+| ------------------------ | ---------------- | ------------------------------------ |
+| `mneme_requestAccounts`  | (none)           | `[address]`, prompts user if first time |
+| `mneme_accounts`         | (none)           | Currently-connected accounts, no prompt |
+| `mneme_chainId`          | (none)           | `"ligate-devnet-1"` (string), or `"ligate-1"` post-mainnet |
+| `mneme_chainHash`        | (none)           | 32-byte chain hash hex (for tx domain separation) |
+
+### Chain identity methods
+
+```ts
+const chainId = await window.mneme.request({ method: 'mneme_chainId' })
+// → "ligate-devnet-1"
+
+const chainHash = await window.mneme.request({ method: 'mneme_chainHash' })
+// → "abcd...64chars"
+```
+
+### Signing methods
+
+| Method                    | Params                                                      | Returns                       |
+| ------------------------- | ----------------------------------------------------------- | ----------------------------- |
+| `mneme_signTransfer`      | `{to, amountNano, tokenId}`                                 | `{txHash, included}`          |
+| `mneme_signAttestation`   | `{schemaId, payloadHash}`                                   | `AttestorSignature`            |
+| `mneme_submitAttestation` | `{schemaId, payloadHash, signatures}`                       | `{attestationId, txHash}`     |
+| `mneme_signTx`            | `{rawTx}` (hex-encoded `borsh(UnsignedTransaction)`)        | `{signedTx}` (hex)            |
+
+The high-level methods (`mneme_signTransfer`,
+`mneme_submitAttestation`) handle nonce lookup, chain hash binding,
+and submission. The low-level method (`mneme_signTx`) returns just
+the signed bytes for the dApp to submit.
+
+### Submit + query methods
+
+| Method                | Params               | Returns                          |
+| --------------------- | -------------------- | -------------------------------- |
+| `mneme_submitTx`      | `{signedTx}` (hex)   | `{txHash}` (queue receipt)       |
+| `mneme_waitInclusion` | `{txHash, timeoutMs}` | `{included, blockHeight}`        |
+| `mneme_balance`       | `{address, tokenId}` | `{amountNano, tokenId}`          |
+
+## Events
+
+```ts
+window.mneme.on('accountsChanged', (accounts) => {
+  // User switched accounts or disconnected (accounts: [])
+})
+
+window.mneme.on('chainChanged', (chainId) => {
+  // User switched networks (e.g. devnet → mainnet at v3)
+})
+
+window.mneme.on('disconnect', () => {
+  // Extension was uninstalled or the dApp's permissions were revoked
+})
+```
+
+Standard EIP-1193 event semantics. Apps that already handle these
+for MetaMask need minimal adaptation.
+
+## Permission model
+
+Per-origin permissions. When a dApp first calls `mneme_requestAccounts`:
+
+1. User sees a connect dialog: origin + requested method scopes
+2. User approves or denies
+3. Approval is persisted in the extension's storage, keyed by origin
+
+User can revoke at any time from the Mneme popup → Connected sites
+→ {origin} → Revoke.
+
+Sign requests (`mneme_signTransfer`, etc.) ALWAYS prompt for
+confirmation, even after origin is connected. The user reviews the
+transaction details (recipient, amount, fee) before signing.
+
+## Example: a Themisra-integrated chat app
+
+```tsx
+function ChatApp() {
+  const [address, setAddress] = useState<string | null>(null)
+
+  async function connect() {
+    if (!window.mneme) return alert('Install Mneme')
+    const [addr] = await window.mneme.request({
+      method: 'mneme_requestAccounts',
+    })
+    setAddress(addr)
+  }
+
+  async function attestExchange(prompt: string, response: string) {
+    const payload = buildThemisraPayload({
+      user_did: `did:lig:${address}`,
+      prompt,
+      response,
+      // ...
+    })
+    const payloadHash = computePayloadHash(payload)
+    const result = await window.mneme.request({
+      method: 'mneme_submitAttestation',
+      params: {
+        schemaId: THEMISRA_SCHEMA_ID,
+        payloadHash,
+        signatures: await collectQuorumSignatures(payloadHash),
+      },
+    })
+    return result.attestationId
+  }
+
+  return address
+    ? <button onClick={() => attestExchange(p, r)}>Attest this exchange</button>
+    : <button onClick={connect}>Connect Mneme</button>
+}
+```
+
+## Coexistence with MetaMask
+
+`window.mneme` is namespaced, so it doesn't clobber `window.ethereum`
+or other wallet providers. Apps can detect and prefer Mneme for
+Ligate-specific operations while keeping MetaMask for EVM.
+
+MetaMask compatibility for Ligate addresses lands at v1 alongside
+the chain's EVM auth lane. After that, Ligate dApps can choose to
+target `window.ethereum` directly; Mneme stays first-class for
+attestation flows because MetaMask doesn't know about
+`mneme_submitAttestation`.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Mneme overview" icon="wallet" href="/mneme">
+    Browser wallet + dApp connector + attest button, together.
+  </Card>
+
+  <Card title="Attest button (consumer surface)" icon="signature" href="/mneme/attest">
+    The other side: injected directly into AI tabs, no dApp needed.
+  </Card>
+
+  <Card title="JS SDK (server / non-extension usage)" icon="js" href="/js">
+    Same primitives without the browser extension.
+  </Card>
+
+  <Card title="Proof of Prompt" icon="book" href="/proof-of-prompt">
+    The receipt format the connector signs.
+  </Card>
+</CardGroup>

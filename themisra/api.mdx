@@ -1,0 +1,209 @@
+---
+title: 'Themisra integration'
+sidebarTitle: 'Integration'
+description: 'Integrate Themisra Proof of Prompt into your product. Wrap an LLM client, register a partner schema, sign attestations, route receipts. Patterns for the four common integration shapes.'
+---
+
+The technical surface to integrate [Themisra](/themisra) into your
+product. Themisra isn't a separate service, it's the canonical
+schema (`themisra.proof-of-prompt v1.0.0`) and federated attestor
+set on Ligate Chain. Partners integrate by submitting attestations
+under the canonical schema, or by registering their own derived
+schema.
+
+<Tip>
+  All Themisra primitives are already in the [chain REST](/rpc),
+  [HTTP API](/api), [TypeScript SDK](/js), and
+  [CLI](/cli). This page focuses on the integration patterns that
+  combine them.
+</Tip>
+
+## The four patterns
+
+### 1. Drop-in model client wrapper
+
+Wrap your existing LLM client so every call produces a receipt
+automatically. Highest coverage, lowest friction.
+
+```ts
+import Anthropic from '@anthropic-ai/sdk'
+import { submitAttestation, signAttestation } from '@ligate-labs/sdk'
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+async function chatWithReceipt(prompt: string) {
+  const response = await anthropic.messages.create({
+    model: 'claude-opus-4-7',
+    max_tokens: 1024,
+    messages: [{ role: 'user', content: prompt }],
+  })
+  const responseText = response.content[0].text
+
+  // Build the canonical Themisra payload.
+  const payload = {
+    spec_version: '1.0.0',
+    user_did: `did:lig:${userAddress}`,
+    model_id: 'anthropic/claude-opus:4.7',
+    prompt_hash: sha256Hex(canonicalize(prompt)),
+    response_hash: sha256Hex(canonicalize(responseText)),
+    created_at: new Date().toISOString(),
+  }
+
+  // Submit (relayer-mediated or direct, see "Who signs" below).
+  const attestation = await submitThemisra(payload)
+  return { response: responseText, attestation }
+}
+```
+
+Best for: services where attestation should be the default behavior
+on every call.
+
+### 2. Post-hoc capture (explicit attest)
+
+Let the user decide. Capture the interaction, expose an "Attest"
+button, only submit on click.
+
+```ts
+// Conversation already happened, capture the pair:
+const captured = { prompt, response, model_id: 'anthropic/claude-opus:4.7', t: Date.now() }
+
+// User clicks Attest:
+async function onAttestClick() {
+  const payload = buildPayload(captured, userAddress)
+  const attestation = await submitThemisra(payload)
+  showReceipt(attestation.attestationId)   // lat1...
+}
+```
+
+Best for: end-user-facing tools where consent matters (this is what
+the [Mneme attest button](/mneme/attest) does for ChatGPT / Claude
+/ Gemini tabs).
+
+### 3. Server-side proxy
+
+Run a server that forwards LLM calls and signs the receipt
+centrally. Users don't manage keys; you do.
+
+```
+Browser ──prompt──▶ Your proxy ──forward──▶ Anthropic API
+                          │                       │
+                          ◀──response─────────────┘
+                          │
+                          ▼
+                   Sign + submit
+                   attestation
+                          │
+                          ▼
+                  rpc.ligate.io
+```
+
+Best for: enterprises that need centralized control, audit trail,
+and one signing key per org.
+
+### 4. Iris MCP (agents)
+
+Agents don't hold keys. They call [Iris MCP](/iris/mcp) which signs
+and submits on their behalf, billed in USD.
+
+Best for: autonomous agent workflows (Claude Desktop, Cursor,
+LangGraph, OpenAI Agents SDK).
+
+## Who signs
+
+Three options for the signing key:
+
+| Option              | Key holder           | Best for                                                       |
+| ------------------- | -------------------- | -------------------------------------------------------------- |
+| User wallet         | The end user (Mneme) | Consumer apps, sovereign identity claims                       |
+| Service signing key | Your backend         | SaaS products, server-mediated interactions                    |
+| Iris relayer        | Ligate Labs          | Agents, anywhere "I don't want to hold $LGT" is the constraint |
+
+The on-chain `submitter` field reflects whoever's key signed the
+`SubmitAttestation` tx. The off-chain `user_did` field in the
+Themisra payload reflects who PROMPTED the LLM, which may be
+different (e.g. a relayer-submitted attestation where `submitter`
+is the relayer's address but `user_did` is the human's `lig1...`).
+
+## Register a partner schema
+
+Themisra v1.0.0 is the **canonical** schema. Partners with
+different payload requirements register their own schema, either:
+
+- **A derived schema**, same shape as v1.0.0 but using their own
+  attestor set (e.g. an enterprise running their own quorum of
+  attestors for compliance reasons)
+- **A custom schema**, different payload shape entirely (e.g. an
+  agent-action schema with different required fields)
+
+CLI:
+
+```bash
+# 1. Register your attestor set (3-of-5)
+ligate register-attestor-set \
+  --members lpk1... lpk1... lpk1... lpk1... lpk1... \
+  --threshold 3 \
+  --signer alice
+# → returns las1... id
+
+# 2. Register your schema bound to it
+ligate register-schema \
+  --name myorg.proof-of-prompt \
+  --version 1 \
+  --attestor-set las1... \
+  --fee-routing-bps 5000 \
+  --fee-routing-addr lig1... \
+  --payload-spec-hash <32-byte hex sha256 of the JSON-Schema> \
+  --signer alice
+# → returns lsc1... id
+```
+
+The `fee_routing_bps` (basis points, max 5000 = 50%) is how much of
+each per-attestation fee routes to your `fee_routing_addr` instead
+of the protocol treasury. Schema owners earn from every attestation
+under their schema.
+
+## Canonical encoding
+
+Two layers of canonical bytes matter for hash agreement:
+
+- **`prompt_hash` and `response_hash`**: SHA-256 over the canonical
+  text bytes, NFC-normalised Unicode, no leading or trailing
+  whitespace, LF line endings, UTF-8. Hex-encoded, lowercase, no
+  `0x` prefix.
+- **`payload_hash`**: SHA-256 over the canonical Borsh encoding of
+  the `SignedAttestationPayload`. The SDK + CLI both handle this;
+  re-implementing from scratch needs care.
+
+Off-chain attestor services SHOULD reject payloads whose claimed
+`prompt_hash` doesn't match the canonicalised prompt they witnessed,
+or whose `created_at` is in the future or more than 24 h in the past.
+
+## Webhooks (planned)
+
+A webhook surface is on the roadmap. When an attestation lands
+on-chain, you'd get a POST to a configured URL with the attestation
+id, schema id, and submitter. Until that ships, poll
+`/v1/ledger/events` on a node or subscribe to the
+`/v1/ledger/slots/latest/events/ws` WebSocket stream and filter for
+`attestation.SubmitAttestation` events.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Themisra overview" icon="signature" href="/themisra">
+    What Themisra is, what's live on devnet, the receipt model.
+  </Card>
+
+  <Card title="Proof of Prompt spec" icon="book" href="/proof-of-prompt">
+    Canonical schema fields, attestor quorum, verification.
+  </Card>
+
+  <Card title="JS SDK attestation flow" icon="js" href="/js">
+    Code-level: `signAttestation`, `submitAttestation`, `submitRegisterSchema`.
+  </Card>
+
+  <Card title="CLI attestation commands" icon="terminal" href="/cli">
+    `ligate attest`, `ligate register-schema`, `ligate register-attestor-set`.
+  </Card>
+</CardGroup>
+
