@@ -1,0 +1,30 @@
+---
+title: 'Node operators'
+sidebarTitle: 'Nodes'
+description: 'Run an attestor on ligate-devnet-1. Hardware requirements, Docker image, stake, and slashing. Earn testnet $LGT and position as a day-one operator on mainnet.'
+---
+
+<Info>
+  This page is in active migration. Until then, see the
+  [devnet status](/devnet) or
+  [contact us](mailto:hello@ligate.io) for operator onboarding.
+</Info>
+
+Attestor nodes (followers) sign Proof of Prompt receipts and post blobs
+to Celestia. Running one on devnet earns testnet `$LGT` and positions
+you as a day-one operator when mainnet opens.
+
+Reference shape from the public devnet deploy runbook
+([`public-devnet-deploy.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/public-devnet-deploy.md)):
+
+| Role      | GCP shape       | vCPU | RAM   | Boot disk | Data disk |
+| --------- | --------------- | ---- | ----- | --------- | --------- |
+| Sequencer | `e2-standard-4` | 4    | 16 GB | 20 GB SSD | 150 GB SSD |
+| Follower  | `e2-medium`     | 2    | 4 GB  | 20 GB SSD | 100 GB SSD |
+
+OS: **Ubuntu 24.04 LTS** (the released `ligate-node` binary links against
+GLIBC 2.39; Debian 12 ships GLIBC 2.36 and won't load it without
+rebuilding from source).
+
+Full operator guide (Docker, Grafana, stake + slashing, runbook) lands
+in the next migration pass.

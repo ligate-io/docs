@@ -1,0 +1,112 @@
+---
+title: 'Chain architecture'
+sidebarTitle: 'Chain'
+description: 'Ligate Chain architecture: Sovereign SDK rollup on Celestia, the attestation module, state layout, RPC, governance, and the module roadmap.'
+---
+
+Ligate Chain is a sovereign rollup built with the Sovereign SDK on Celestia.
+Its core primitive is a generic, permissionless attestation protocol.
+`ligate-devnet-1` is live on Celestia Mocha-testnet.
+
+<Tip>
+  `ligate-devnet-1` is live on Celestia Mocha-testnet. Full protocol
+  specification:
+  [`ligate-chain/docs/protocol/attestation-v0.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/attestation-v0.md).
+  Source:
+  [github.com/ligate-io/ligate-chain](https://github.com/ligate-io/ligate-chain).
+</Tip>
+
+## The stack
+
+| Layer             | Choice                                                                     |
+| ----------------- | -------------------------------------------------------------------------- |
+| Rollup framework  | Sovereign SDK (Rust)                                                       |
+| Data availability | Celestia                                                                   |
+| Token             | `$LGT`, gas, registration fees, per-attestation fees, staking, governance |
+| Cross-chain       | Hyperlane (lands at v2)                                                    |
+
+## Modules
+
+The chain is organised as Sovereign SDK modules. v0 ships with one
+Ligate-native module plus the SDK base modules carried for free.
+
+### Shipping at v0
+
+- **`attestation`** (Ligate-native), schemas, attestor sets, write-once
+  attestations. See [Proof of Prompt](/proof-of-prompt) for the canonical
+  consumer.
+- **SDK base modules** carried from the Sovereign SDK: `bank`,
+  `accounts`, `chain_state`, `sequencer_registry`, `attester_incentives`,
+  `prover_incentives`, `operator_incentives`. Same shape as the SDK demo
+  runtime; transfers, accounts, and incentive accounting work out of
+  the box.
+
+### Planned (v1)
+
+Tracked in
+[`docs/protocol/upgrades.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/upgrades.md):
+
+- **`governance`** ([#41](https://github.com/ligate-io/ligate-chain/issues/41)),
+  on-chain proposals + voting + execution for parameter changes (fees,
+  `max_builder_bps`, treasury address)
+- **`upgrade`** ([#42](https://github.com/ligate-io/ligate-chain/issues/42)),
+  coordinated runtime swaps at scheduled block heights (Cosmos SDK
+  `x/upgrade` semantics)
+- **`disputes`** ([#51](https://github.com/ligate-io/ligate-chain/issues/51)),
+  on-chain flagging and attestor slashing tied to AttestorSet stake
+
+### Future-reserved
+
+- **`nft`** and **`tokens`** modules, prefixes (`lcc1...`, `ltk1...`)
+  reserved in the address ladder, modules ship when product surface
+  demands them
+- Proof-carrying schemas (zkML / TEE proof hashes in attestation
+  payloads), tracked under design research; not yet scheduled
+
+## State layout (attestation module)
+
+Three `StateMap`s:
+
+- `schemas: SchemaId → Schema`
+- `attestor_sets: AttestorSetId → AttestorSet`
+- `attestations: (SchemaId, PayloadHash) → Attestation` (write-once)
+
+## RPC
+
+Query endpoints (read-only) and transaction calls (write). Every running node
+serves OpenAPI 3 at `/v1/openapi-v3.json` and an interactive Swagger UI at
+`/v1/swagger-ui`. See the [chain RPC reference](/rpc) for the full surface,
+including the 115 endpoints under `/v1/` and the `chain_id` /
+`chain_hash` / version identity contract.
+
+## Governance
+
+`$LGT` holders vote on protocol parameters (default fees, builder fee cap,
+schema registration costs) and module upgrades. Start centralised sequencer,
+decentralise as the attestor network matures. Same arc as Base, Arbitrum,
+Optimism.
+
+## Consensus: Proof of Useful Attestation
+
+Mainnet (v3) activates a custom consensus weighting called **Proof of Useful
+Attestation** (PoUA). Standard Proof of Stake selects block proposers as a
+function of bonded capital alone; PoUA computes validator weight as the
+product of bonded stake and a non-transferable reputation score earned
+through processing valid attestations and lost on detected misbehaviour. The
+mechanism inherits the safety and liveness properties of the underlying BFT
+primitive and constructs a multiplicative cost-to-attack premium of 4 to 10x
+over equivalent pure-stake chains.
+
+Bootstrap (v0 through v2) runs as stake-only Proof of Stake while the
+mechanism is finalised, externally reviewed, and validated through simulation
+and devnet operation. v3 activates PoUA from mainnet genesis with a designed
+warmup period during which reputation accrues before entering vote weight;
+activation is a single governance transaction at the end of warmup, not a
+hard fork.
+
+The full design specification, formal threat model, security analysis (with
+cost-to-grind bound under compound capital-and-grinding adversaries), and
+integration with the Sovereign SDK live in the public research repository at
+[github.com/ligate-io/ligate-research](https://github.com/ligate-io/ligate-research).
+A long-form explainer is published on the marketing blog at
+[ligate.io/blog/proof-of-useful-attestation](https://ligate.io/blog/proof-of-useful-attestation).

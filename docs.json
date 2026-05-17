@@ -1,126 +1,132 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "name": "Ligate Labs",
+  "description": "Developer documentation for Ligate, sovereign rollup, attestation protocol, and the three first-party flagship apps: Themisra (Proof of Prompt), Mneme (browser wallet), and Iris (MCP for AI agents).",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#A7D28C",
+    "light": "#A7D28C",
+    "dark": "#8FBD70"
   },
   "favicon": "/favicon.svg",
-  "navigation": {
-    "tabs": [
-      {
-        "tab": "Guides",
-        "groups": [
-          {
-            "group": "Getting started",
-            "pages": [
-              "index",
-              "quickstart",
-              "development"
-            ]
-          },
-          {
-            "group": "Customization",
-            "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/components",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "Agent ready",
-            "pages": [
-              "agent-ready/prompt",
-              "agent-ready/visibility",
-              "agent-ready/contextual",
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "API reference",
-        "groups": [
-          {
-            "group": "API documentation",
-            "pages": [
-              "api-reference/introduction"
-            ]
-          },
-          {
-            "group": "Endpoint examples",
-            "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
-            ]
-          }
-        ]
-      }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
+  "fonts": {
+    "heading": {
+      "family": "Space Grotesk",
+      "weight": 600
+    },
+    "body": {
+      "family": "Space Grotesk",
+      "weight": 400
     }
   },
   "logo": {
     "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "dark": "/logo/dark.svg",
+    "href": "https://ligate.io"
+  },
+  "appearance": {
+    "default": "dark"
+  },
+  "background": {
+    "decoration": "grid",
+    "color": {
+      "dark": "#0a0a0b",
+      "light": "#f4f2ec"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["introduction", "quickstart", "devnet"]
+          },
+          {
+            "group": "Protocol",
+            "pages": ["chain", "proof-of-prompt", "tokenomics"]
+          },
+          {
+            "group": "Developer surface",
+            "pages": ["cli"]
+          }
+        ]
+      }
+    ]
   },
   "navbar": {
     "links": [
       {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "label": "Explorer",
+        "href": "https://explorer.ligate.io"
+      },
+      {
+        "label": "ligate.io",
+        "href": "https://ligate.io"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "label": "Join devnet",
+      "href": "https://ligate.io/devnet"
     }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+      "x": "https://x.com/ligatelabs",
+      "github": "https://github.com/ligate-io",
+      "linkedin": "https://www.linkedin.com/company/ligate-labs"
+    },
+    "links": [
+      {
+        "header": "Resources",
+        "items": [
+          {
+            "label": "Whitepaper",
+            "href": "https://ligate.io/whitepaper"
+          },
+          {
+            "label": "Roadmap",
+            "href": "https://ligate.io/roadmap"
+          },
+          {
+            "label": "Changelog",
+            "href": "https://ligate.io/changelog"
+          },
+          {
+            "label": "Blog",
+            "href": "https://ligate.io/blog"
+          }
+        ]
+      },
+      {
+        "header": "Community",
+        "items": [
+          {
+            "label": "Discord",
+            "href": "https://discord.gg/ZWUeJ8k3eP"
+          },
+          {
+            "label": "GitHub",
+            "href": "https://github.com/ligate-io"
+          },
+          {
+            "label": "Email",
+            "href": "mailto:hello@ligate.io"
+          }
+        ]
+      }
+    ]
+  },
+  "search": {
+    "prompt": "Search the Ligate docs"
+  },
+  "seo": {
+    "metatags": {
+      "og:site_name": "Ligate Labs Docs",
+      "twitter:site": "@ligatelabs"
+    },
+    "indexing": "navigable"
   }
 }
