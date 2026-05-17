@@ -58,6 +58,10 @@
           {
             "group": "Operators",
             "pages": ["nodes", "operators", "validators"]
+          },
+          {
+            "group": "Products",
+            "pages": ["themisra", "mneme", "iris"]
           }
         ]
       }

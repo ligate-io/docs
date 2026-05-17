@@ -1,19 +1,159 @@
 ---
 title: 'Themisra'
 sidebarTitle: 'Themisra'
-description: 'Themisra is the first canonical schema on Ligate Chain. Proof of Prompt receipts for AI interactions, signed by an attestor quorum, anchored on Celestia.'
+description: 'Proof of Prompt: cryptographic receipts for AI interactions. The first canonical schema on Ligate Chain. Anchored on Celestia via federated attestor quorum.'
 ---
 
-<Info>
-  This page is in active migration. Until then, see the
-  [Proof of Prompt spec](/proof-of-prompt), the
-  [Themisra landing page](https://themisra.xyz), or
-  [contact us](mailto:hello@ligate.io).
-</Info>
+Themisra wraps any AI interaction in a cryptographic receipt: a hash
+of the prompt, a hash of the response, the model id, a UTC timestamp,
+the user's identity, and a quorum signature from federated attestors,
+anchored on Celestia.
 
-Themisra is the canonical consumer of the `attestation` module on Ligate
-Chain. It registers the `themisra.proof-of-prompt/v1` schema, runs the
-default attestor quorum, and ships SDKs in Python, TypeScript, Rust, and
-Go.
+Themisra is the canonical consumer of the `attestation` module on
+Ligate Chain. It registers the `themisra.proof-of-prompt v1.0.0`
+schema and operates the default federated attestor set.
 
-Full developer docs land in the next migration pass.
+<Tip>
+  Landing site: [themisra.xyz](https://themisra.xyz). Schema spec:
+  [/proof-of-prompt](/proof-of-prompt). Schema source:
+  [`themisra.proof-of-prompt-v1.json`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/schemas/themisra.proof-of-prompt-v1.json).
+</Tip>
+
+## What's live on `ligate-devnet-1`
+
+- The `themisra.proof-of-prompt v1.0.0` JSON-Schema is registered
+  on-chain. Schema id format `lsc1...`.
+- A 3-of-? federated attestor set is operational, pubkeys assigned at
+  the operator key ceremony. Attestor-set id format `las1...`.
+- The chain accepts `SubmitAttestation` transactions under the
+  schema. Attestation id format `lat1...`.
+- The TypeScript [SDK](/js) has the full `signAttestation` +
+  `submitAttestation` surface. The [CLI](/cli) has
+  `ligate attest`, `ligate sign-attestation`,
+  `ligate submit-attestation`, `ligate register-schema`,
+  `ligate register-attestor-set`.
+
+## The receipt
+
+Two layers, by design:
+
+**On-chain**: a compact generic Attestation record (`schema_id`,
+`payload_hash`, `submitter`, `timestamp`, `signatures`). The chain
+never sees the prompt or response.
+
+**Off-chain Themisra payload** (defined by the schema, content of
+what `payload_hash` is computed against):
+
+```json
+{
+  "spec_version": "1.0.0",
+  "user_did": "lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b",
+  "model_id": "anthropic/claude-opus:4.7",
+  "prompt_hash": "<64-char hex sha256>",
+  "response_hash": "<64-char hex sha256>",
+  "created_at": "2026-05-17T03:00:00Z"
+}
+```
+
+Required: `spec_version`, `user_did`, `model_id`, `prompt_hash`,
+`response_hash`, `created_at`. Optional: `system_prompt_hash`,
+`provider_id`, `tool_id`, `prompt_uri`, `response_uri`. Full field
+reference: [Proof of Prompt](/proof-of-prompt).
+
+## Submit an attestation
+
+End-to-end against `ligate-devnet-1`:
+
+```bash
+ligate attest \
+  --schema themisra.proof-of-prompt/v1 \
+  --model-id "anthropic/claude-opus:4.7" \
+  --prompt "Write a recursive descent parser in Rust" \
+  --response ./response.md \
+  --signer alice
+```
+
+The CLI canonicalises the prompt + response (NFC normalised UTF-8,
+LF line endings, stripped whitespace), computes SHA-256 of each,
+assembles the off-chain payload, hashes it to `payload_hash`,
+collects the federated attestor quorum's signatures, and submits the
+on-chain `SubmitAttestation` tx.
+
+From a service (TypeScript):
+
+```ts
+import { submitAttestation, signAttestation } from '@ligate-labs/sdk'
+
+// Each attestor signs locally.
+const sig = signAttestation({
+  privateKey: attestorPrivateKey,
+  schemaId: 'lsc1...',          // themisra.proof-of-prompt/v1
+  payloadHash: 'lph1...',
+  submitter: 'lig1...',
+  timestamp: BigInt(Math.floor(Date.now() / 1000)),
+})
+
+// Owner aggregates + submits.
+await submitAttestation({
+  rpcUrl: 'https://rpc.ligate.io',
+  privateKey: ownerPrivateKey,
+  publicKey: ownerPublicKey,
+  schemaId: 'lsc1...',
+  payloadHash: 'lph1...',
+  signatures: [sig1, sig2, sig3],   // M-of-N threshold
+  nonce,
+  chainId: 4242n,
+  chainHash,
+})
+```
+
+## Verify
+
+Three independent checks:
+
+1. The on-chain `Attestation` exists. Point lookup by
+   `(schema_id, payload_hash)` at
+   `GET /v1/modules/attestation/attestations/{schemaId}:{payloadHash}`.
+2. Recompute `payload_hash` from the off-chain payload, matches what's
+   on-chain.
+3. Recompute each attestor signature over the canonical
+   `SignedAttestationPayload`, count of valid signatures `>=`
+   `attestor_set.threshold`.
+
+Full verification semantics: [Proof of Prompt, Verification](/proof-of-prompt#verification).
+
+## What's not yet
+
+- **Selective redaction.** The current `payload_hash` is a single
+  digest over the full payload. ZK-redactable receipts (prove a
+  field is internally consistent without revealing it) are Phase 2,
+  tracked on the [roadmap](https://ligate.io/roadmap).
+- **Model attestation.** We hash `model_id` as a string. Verifying
+  the provider actually ran those weights is Phase 3 (TEEs / MPC
+  inference).
+- **Chain of prompt.** Each receipt is independent in v1. A future
+  revision will encode causal chains (agent loops, retrieval,
+  multi-turn).
+- **Non-TS SDKs.** Python / Rust / Go SDKs are planned. The chain
+  surface is fully specified, so building one is just consuming the
+  REST + Borsh layout.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Proof of Prompt spec" icon="signature" href="/proof-of-prompt">
+    Field-by-field reference, canonical encoding, attestor quorum.
+  </Card>
+
+  <Card title="JavaScript SDK" icon="js" href="/js">
+    Full `signAttestation` + `submitAttestation` flow in TS.
+  </Card>
+
+  <Card title="CLI: attest + register" icon="terminal" href="/cli">
+    `ligate attest`, `ligate register-schema`, `ligate register-attestor-set`.
+  </Card>
+
+  <Card title="Themisra landing" icon="globe" href="https://themisra.xyz">
+    Marketing surface and partner onboarding.
+  </Card>
+</CardGroup>
