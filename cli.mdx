@@ -171,8 +171,9 @@ ligate transfer \
   (the standalone `ligate-io/faucet` service was archived; the live
   faucet is on `api.ligate.io/v1/drip`). The CLI also hardcodes
   `/faucet` as the path suffix, so `--faucet-url` can't paper over
-  the host change either. Until the next CLI release fixes this,
-  use `curl` directly (below).
+  the host change either. Tracking:
+  [ligate-cli#34](https://github.com/ligate-io/ligate-cli/issues/34).
+  Until the fix ships, use `curl` directly (below).
 </Warning>
 
 Claim a one-shot drip from the public devnet faucet. Positional
