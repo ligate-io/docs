@@ -35,7 +35,8 @@ Works with `npm install` and `yarn add` interchangeably.
 ```ts
 import { generateKeypair, LigateClient, submitTransfer } from '@ligate-labs/sdk'
 
-// Generate or load a key. { address, publicKey, privateKey, privateKeyHex }.
+// Generate or load a key. Returns:
+//   { privateKeyHex: string, publicKey: Uint8Array, address: string }
 const sender = generateKeypair()
 console.log('address:', sender.address)
 
@@ -84,7 +85,8 @@ import {
   signAttestation,
 } from '@ligate-labs/sdk'
 
-const client = new LigateClient({ rpcUrl: 'https://rpc.ligate.io' })
+const RPC_URL = 'https://rpc.ligate.io'
+const client = new LigateClient({ rpcUrl: RPC_URL })
 const info = await client.getRollupInfo()
 const owner = keypairFromPrivateKey(process.env.LIGATE_KEY!)
 const nonce = await client.getNonce(owner.publicKey)
@@ -92,7 +94,7 @@ const nonce = await client.getNonce(owner.publicKey)
 // 1. Register a 3-of-3 attestor set (idempotent: re-runs return the
 //    existing las1... id).
 const setResult = await submitRegisterAttestorSet({
-  rpcUrl: client.rpcUrl,
+  rpcUrl: RPC_URL,
   privateKey: owner.privateKeyHex,
   publicKey: owner.publicKey,
   members: [pub1, pub2, pub3],   // ed25519 pubkeys
@@ -104,7 +106,7 @@ const setResult = await submitRegisterAttestorSet({
 
 // 2. Register a schema bound to that attestor set.
 const schemaResult = await submitRegisterSchema({
-  rpcUrl: client.rpcUrl,
+  rpcUrl: RPC_URL,
   privateKey: owner.privateKeyHex,
   publicKey: owner.publicKey,
   name: 'themisra.proof-of-prompt',
@@ -131,7 +133,7 @@ const sig1 = signAttestation({
 // ... sig2, sig3 from other attestors ...
 
 const attestation = await submitAttestation({
-  rpcUrl: client.rpcUrl,
+  rpcUrl: RPC_URL,
   privateKey: owner.privateKeyHex,
   publicKey: owner.publicKey,
   schemaId: schemaResult.schemaId,
@@ -230,6 +232,44 @@ JSDoc via TypeDoc (`pnpm run docs` in the SDK repo, or grab the
 
 `LigateClient`, `appendV1`, `DEFAULT_MAX_FEE_NANO`. Types:
 `LigateClientOptions`, `RollupInfo`, `CoinsResponse`.
+
+`LigateClient` instance methods (per `src/client.ts`):
+
+| Method                                                         | Returns                | Wraps                                           |
+| -------------------------------------------------------------- | ---------------------- | ----------------------------------------------- |
+| `getRollupInfo()`                                              | `RollupInfo`           | `GET /v1/rollup/info`                           |
+| `getNonce(publicKey: Uint8Array)`                              | `bigint`               | `GET /v1/rollup/addresses/{credId}/dedup`       |
+| `getBalance(address, tokenId)`                                 | `bigint`               | `GET /v1/modules/bank/tokens/{tokenId}/balances/{addr}` |
+| `listBlocks({limit?, before?})`                                | `T`                    | `GET /v1/blocks` on `api.ligate.io`             |
+| `getBlock(height)`                                             | `T`                    | `GET /v1/blocks/{height}`                       |
+| `listTxs({limit?, before?})`                                   | `T`                    | `GET /v1/txs`                                   |
+| `getTx(hash)`                                                  | `T`                    | `GET /v1/txs/{hash}`                            |
+| `getAddressSummary(address)`                                   | `T`                    | `GET /v1/addresses/{addr}`                      |
+| `listSchemas({limit?, before?})`                               | `T`                    | `GET /v1/schemas`                               |
+| `getSchema(id)`                                                | `T`                    | `GET /v1/schemas/{id}`                          |
+| `getAttestorSet(id)`                                           | `T`                    | `GET /v1/attestor-sets/{id}`                    |
+| `listAttestorSets({limit?, before?})`                          | `T`                    | `GET /v1/attestor-sets`                         |
+| `listAttestations({limit?, before?, schema?, submitter?})`     | `T`                    | `GET /v1/attestations`                          |
+| `getAttestation(id)`                                           | `T`                    | `GET /v1/attestations/{id}`                     |
+| `listAttestationsBySchema(schemaId, {limit?, before?})`        | `T`                    | `GET /v1/schemas/{id}/attestations`             |
+| `listAttestationsByAttestor(attestorSetId, {limit?, before?})` | `T`                    | `GET /v1/attestor-sets/{id}/attestations`       |
+| `getJson(path)` / `getRaw(path)` / `postJson(path, body)`      | generic                | escape hatches                                  |
+
+**Routing**: every `LigateClient` method hits the URL you passed at
+construction (`rpcUrl` + `/v1` + the per-method path). Identity +
+balance routes (`/rollup/...`, `/modules/bank/...`) live on the
+chain at `rpc.ligate.io`. Indexer routes (`/blocks`, `/txs`,
+`/schemas`, `/attestor-sets`, `/attestations`) live on
+`api.ligate.io`. The SDK doesn't auto-route, construct two
+`LigateClient` instances if you need both:
+
+```ts
+const chain = new LigateClient({ rpcUrl: 'https://rpc.ligate.io' })
+const api   = new LigateClient({ rpcUrl: 'https://api.ligate.io' })
+
+const info = await chain.getRollupInfo()
+const recentBlocks = await api.listBlocks({ limit: 20 })
+```
 
 ### Submit pipeline
 
