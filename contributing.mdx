@@ -1,0 +1,117 @@
+---
+title: 'Contributing'
+sidebarTitle: 'Contributing'
+description: 'Contribute to the Ligate docs or to any open-source repo under github.com/ligate-io. CLA flow, local dev, writing conventions, and where to file issues.'
+---
+
+These docs and every open-source Ligate repo welcome contributions.
+This page covers the contribution flow for the docs specifically;
+linked repos have their own `CONTRIBUTING.md`.
+
+## CLA
+
+Ligate Labs requires a **Contributor License Agreement** for every
+contribution, signed once per contributor and valid for all future
+PRs.
+
+The full text: [`CLA.md`](https://github.com/ligate-io/docs/blob/main/CLA.md).
+First time you open a PR on any `ligate-io/*` repo with the CLA
+Assistant workflow installed, a bot will comment with a sign link.
+One click signs and unblocks the PR.
+
+Bots and Ligate Labs employees are allowlisted from the CLA check.
+
+## Edit a page
+
+### On GitHub (smallest changes)
+
+1. Click the "Edit this page" link on any docs page (Mintlify renders
+   it in the page chrome)
+2. Make your edit in the GitHub web editor
+3. Submit a pull request
+
+Good for typos, broken links, one-paragraph improvements.
+
+### Locally (larger changes)
+
+```bash
+git clone https://github.com/ligate-io/docs
+cd docs
+npm i -g mint            # one-time
+mint dev                 # http://localhost:3000
+```
+
+Edit `.mdx` files at the repo root. The dev server hot-reloads. Open
+a PR against `main` when ready.
+
+## Conventions
+
+### Writing
+
+- **Active voice.** "Run the command" not "The command should be
+  run."
+- **Address the reader directly.** "You" instead of "the user."
+- **No em dashes** in prose, the project style prefers periods,
+  commas, colons, or parens.
+- **Sentence case** in headings (`## Submitting a transaction`, not
+  `## Submitting A Transaction`).
+- **One idea per sentence** where it works without sounding terse.
+
+### Code
+
+- **Real commands and outputs.** If the example doesn't actually run
+  on the live devnet, mark it with a `<Warning>` or annotate it as
+  illustrative.
+- **Pin versions in install snippets** so someone copy-pasting today
+  gets a reproducible install.
+- **Canonical addresses + token ids** in examples; the Ligate ones
+  in the [glossary](/glossary) are safe to reuse.
+
+### Source verification
+
+When you write or change a doc that asserts a technical fact (chain
+behavior, CLI flag, API endpoint), grep the source repo for the
+truth before writing. README files drift; code doesn't.
+
+| Claim about       | Verify against                                                |
+| ----------------- | ------------------------------------------------------------- |
+| Chain primitives  | [`ligate-chain`](https://github.com/ligate-io/ligate-chain)   |
+| CLI flags         | [`ligate-cli/src/cli.rs`](https://github.com/ligate-io/ligate-cli/blob/main/src/cli.rs) |
+| JS SDK API        | [`ligate-js/src/index.ts`](https://github.com/ligate-io/ligate-js/blob/main/src/index.ts) |
+| HTTP API endpoints| [`ligate-api/crates/api/src/main.rs`](https://github.com/ligate-io/ligate-api/blob/main/crates/api/src/main.rs) |
+| Faucet            | [`ligate-api/crates/drip`](https://github.com/ligate-io/ligate-api/tree/main/crates/drip) |
+
+## File issues
+
+Per repo:
+
+- **Docs issues, this repo**:
+  [github.com/ligate-io/docs/issues](https://github.com/ligate-io/docs/issues)
+- **Chain bugs / spec questions**:
+  [github.com/ligate-io/ligate-chain/issues](https://github.com/ligate-io/ligate-chain/issues)
+- **CLI issues**:
+  [github.com/ligate-io/ligate-cli/issues](https://github.com/ligate-io/ligate-cli/issues)
+- **JS SDK issues**:
+  [github.com/ligate-io/ligate-js/issues](https://github.com/ligate-io/ligate-js/issues)
+- **HTTP API issues**:
+  [github.com/ligate-io/ligate-api/issues](https://github.com/ligate-io/ligate-api/issues)
+
+For protocol-level proposals (new module, schema, consensus change),
+open an issue in
+[`ligate-research`](https://github.com/ligate-io/ligate-research)
+with the `LIP` label.
+
+## Other ways to help
+
+- **Run a node.** Pre-mainnet, we need follower diversity. See
+  [Run a node](/nodes).
+- **Submit attestations.** The Themisra attestor set processes
+  prompts now; running clients against
+  `themisra.proof-of-prompt v1.0.0` surfaces edge cases.
+- **Report drift.** If a docs page claims a thing that doesn't match
+  what you see on a live `ligate-node`, that's a bug. File it.
+
+## Contact
+
+Pre-launch, the fastest path is email:
+[hello@ligate.io](mailto:hello@ligate.io).

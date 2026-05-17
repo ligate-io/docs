@@ -1,34 +1,56 @@
-> **Customize this file**: Tailor this template to your project by noting specific contribution types you're looking for, adding a Code of Conduct, or adjusting the writing guidelines to match your style.
+# Contributing
 
-# Contribute to the documentation
+These docs welcome external contributions. The full contributor guide
+lives at [`contributing.mdx`](contributing.mdx) (rendered at
+[docs.ligate.io/contributing](https://docs.ligate.io/contributing));
+this file is the source-tree summary for anyone landing here from
+GitHub.
 
-Thank you for your interest in contributing to our documentation! This guide will help you get started.
+## Two-minute version
 
-## How to contribute
+1. Click the "Edit this page" link on any docs page (the GitHub web
+   editor handles the rest), or `git clone` and edit `.mdx` files
+   locally.
+2. Open a PR against `main`.
+3. The CLA Assistant workflow comments with a sign link on your first
+   PR; one click signs and unblocks the PR. Bots and Ligate Labs
+   employees are allowlisted.
+4. CI runs `mint broken-links` to catch reference rot; Mintlify
+   builds a preview for review.
 
-### Option 1: Edit directly on GitHub
+## Local dev
 
-1. Navigate to the page you want to edit
-2. Click the "Edit this file" button (the pencil icon)
-3. Make your changes and submit a pull request
+```bash
+git clone https://github.com/ligate-io/docs
+cd docs
+npm i -g mint
+mint dev      # http://localhost:3000, hot-reloads on save
+```
 
-### Option 2: Local development
+## Conventions
 
-1. Fork and clone this repository
-2. Install the Mintlify CLI: `npm i -g mint`
-3. Create a branch for your changes
-4. Make changes
-5. Navigate to the docs directory and run `mint dev`
-6. Preview your changes at `http://localhost:3000`
-7. Commit your changes and submit a pull request
+- **Active voice**, address the reader as "you", sentence-case
+  headings.
+- **No em dashes** in prose. Periods, commas, colons, parens.
+- **Verify against source**, README files drift, code doesn't. Map
+  in [`contributing.mdx`](contributing.mdx) under "Source
+  verification".
+- **One commit message line** per commit. No multi-paragraph bodies.
 
-For more details on local development, see our [development guide](development.mdx).
+## File issues
 
-## Writing guidelines
+- **This repo**: [github.com/ligate-io/docs/issues](https://github.com/ligate-io/docs/issues)
+- **Chain bugs**: [github.com/ligate-io/ligate-chain/issues](https://github.com/ligate-io/ligate-chain/issues)
+- **CLI**: [github.com/ligate-io/ligate-cli/issues](https://github.com/ligate-io/ligate-cli/issues)
+- **JS SDK**: [github.com/ligate-io/ligate-js/issues](https://github.com/ligate-io/ligate-js/issues)
+- **HTTP API**: [github.com/ligate-io/ligate-api/issues](https://github.com/ligate-io/ligate-api/issues)
 
-- **Use active voice**: "Run the command" not "The command should be run"
-- **Address the reader directly**: Use "you" instead of "the user"
-- **Keep sentences concise**: Aim for one idea per sentence
-- **Lead with the goal**: Start instructions with what the user wants to accomplish
-- **Use consistent terminology**: Don't alternate between synonyms for the same concept
-- **Include examples**: Show, don't just tell
+For protocol proposals, open in
+[`ligate-research`](https://github.com/ligate-io/ligate-research)
+with the `LIP` label.
+
+## License
+
+Contributions are licensed under the
+[Ligate Labs Inc. Contribution License Agreement](CLA.md). Repo
+license: see [`LICENSE`](LICENSE).

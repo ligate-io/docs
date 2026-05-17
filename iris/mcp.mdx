@@ -1,0 +1,172 @@
+---
+title: 'Iris MCP server'
+sidebarTitle: 'MCP server'
+description: 'Iris MCP server: open-source Model Context Protocol server exposing record, verify, query, and schemas tools to any MCP-speaking agent framework. MIT-licensed, no Ligate Labs hosting required.'
+---
+
+The Iris MCP server is the open-source half of [Iris](/iris). It
+plugs into any Model Context Protocol-speaking agent framework
+(Claude Desktop, Cursor, LangGraph, OpenAI Agents SDK) and exposes
+four tools that wrap the chain's attestation surface.
+
+<Warning>
+  **Planned.** Slated for Q4 2026 / Q1 2027 alongside the rest of
+  Iris. The MCP tool surface and pricing model are public; the
+  package + hosted relayer are in development. Until then, agent
+  code can submit attestations directly via the
+  [JavaScript SDK](/js).
+</Warning>
+
+## License
+
+**MIT.** The MCP server is meant to be embeddable, redistributable,
+and self-hostable. Operators who don't want Ligate Labs in the
+inference path can point the server at their own
+[relayer](/iris/relayer) or sign directly with a self-managed key.
+
+## Install
+
+Standard MCP install pattern. Example for Claude Desktop:
+
+```json
+// .claude/mcp_servers.json
+{
+  "iris": {
+    "command": "npx",
+    "args": ["-y", "@ligate-labs/iris-mcp"],
+    "env": {
+      "IRIS_RELAYER_KEY": "sk_live_..."
+    }
+  }
+}
+```
+
+Other frameworks follow the same shape: a command that runs the MCP
+server, env vars for credentials.
+
+## Tools
+
+| Tool       | Input                                                                  | Returns                                  |
+| ---------- | ---------------------------------------------------------------------- | ---------------------------------------- |
+| `record`   | `{schema, payload}`, payload shape determined by the schema           | `{attestation_id, tx_hash, included}`    |
+| `verify`   | `{attestation_id}`, `lat1...` form                                    | `{valid: bool, on_chain, payload_hash, signatures}` |
+| `query`    | `{schema?, submitter?, since?, until?, limit?}`, indexer parameters   | `{attestations: [...], next_cursor}`     |
+| `schemas`  | (no args)                                                              | `{schemas: [...]}`, schemas the agent's org has allowlisted |
+
+### `record`
+
+The primary tool. Agent calls `record` to submit an attestation under
+a known schema. The relayer signs and submits on the agent's behalf;
+the agent never holds a wallet or `$LGT`.
+
+```python
+# Inside an agent tool-use loop
+result = mcp.iris.record(
+    schema="themisra.proof-of-prompt/v1",
+    payload={
+        "spec_version": "1.0.0",
+        "user_did": "did:lig:lig1...",
+        "model_id": "anthropic/claude-opus:4.7",
+        "prompt_hash": sha256(prompt).hex(),
+        "response_hash": sha256(response).hex(),
+        "created_at": now_rfc3339(),
+    },
+)
+# → {"attestation_id": "lat1...", "tx_hash": "ltx1...", "included": true}
+```
+
+The relayer:
+
+1. Validates the payload against the schema's JSON-Schema (rejects
+   if missing required fields or out-of-range values)
+2. Computes `payload_hash` from the canonical payload bytes
+3. Collects the schema's attestor-set quorum signatures
+4. Signs the `SubmitAttestation` tx with the relayer key
+5. Submits to `rpc.ligate.io` and waits for inclusion
+6. Returns the attestation id, tx hash, and inclusion status
+
+Bills the parent org's account in USD; no `$LGT` accounting visible
+to the agent.
+
+### `verify`
+
+```python
+result = mcp.iris.verify(attestation_id="lat1c3a87e...")
+# → {
+#     "valid": true,
+#     "on_chain": true,
+#     "payload_hash": "lph1...",
+#     "signatures": 3,
+#     "schema_id": "lsc1...",
+#     "submitter": "lig1..."
+#   }
+```
+
+Wraps the three independent verification checks (on-chain existence,
+payload_hash recomputation, signature quorum).
+
+### `query`
+
+```python
+result = mcp.iris.query(
+    schema="themisra.proof-of-prompt/v1",
+    submitter="lig1...",
+    since="2026-05-01T00:00:00Z",
+    limit=20,
+)
+# → {"attestations": [...], "next_cursor": "..."}
+```
+
+Indexer-backed query against `api.ligate.io`. Supports
+schema-scoped, submitter-scoped, and time-bounded queries with
+cursor pagination.
+
+### `schemas`
+
+```python
+result = mcp.iris.schemas()
+# → {
+#     "schemas": [
+#       {"id": "lsc1...", "name": "themisra.proof-of-prompt", "version": 1},
+#       {"id": "lsc1...", "name": "myorg.agent-action", "version": 1},
+#     ]
+#   }
+```
+
+Lists the schemas the agent's org has allowlisted. Configured in the
+[relayer dashboard](/iris/relayer) under "Org → Schemas".
+
+## Hot-key / master-key delegation
+
+The agent's relayer key (`IRIS_RELAYER_KEY` in MCP config) is a
+**scoped hot key**, not the master key. Properties:
+
+- Short-lived, configurable TTL (default 24 hours, max 90 days)
+- Revocable at any time from the master key, without restarting the
+  agent's session
+- Restricted to a subset of schemas (per `schemas` tool list)
+- Restricted to a per-window attestation budget
+
+This separation ships as a chain primitive in v1 (the
+[`native delegation`](https://github.com/ligate-io/ligate-research)
+LIP). Iris uses it from day one.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Iris relayer" icon="server" href="/iris/relayer">
+    The other half: USD-billed signing + submission, pricing tiers.
+  </Card>
+
+  <Card title="Iris overview" icon="robot" href="/iris">
+    What Iris is, the two-artifact architecture, integration shape.
+  </Card>
+
+  <Card title="JS SDK (today's primitive)" icon="js" href="/js">
+    Submit attestations from agent code today, without Iris.
+  </Card>
+
+  <Card title="Proof of Prompt" icon="signature" href="/proof-of-prompt">
+    Canonical schema the relayer ships pre-allowlisted.
+  </Card>
+</CardGroup>
