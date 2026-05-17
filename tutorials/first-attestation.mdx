@@ -23,7 +23,7 @@ minutes including faucet drip.
 
 ```bash
 ligate --version
-# ligate-cli 0.1.x-devnet
+# ligate-cli 0.2.0
 
 jq --version
 # jq-1.x
@@ -46,7 +46,7 @@ export LIGATE_LGT_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2
 ligate info
 # chain_id    ligate-devnet-1
 # chain_hash  abcd...
-# version     0.1.2
+# version     0.2.0
 ```
 
 ## Step 2: Generate a keypair
@@ -198,12 +198,15 @@ before submitting.
 ```bash
 ligate submit-attestation \
   --schema $SCHEMA \
-  --payload-hash <bech32m form of $PAYLOAD_HEX> \
+  --payload-hash lph1... \
   --signatures signatures.json \
   --signer alice
 # ✓ attestation submitted
-#   lat1c3a87e…fd9a7c
+#   lat1c3a87e...fd9a7c
 #   tx ltx1...
+
+# Capture the printed lat1... for the next step.
+ATTID=lat1c3a87e...fd9a7c
 ```
 
 The chain validates:
@@ -220,7 +223,7 @@ If any of those fail, the tx is rejected with one of the
 
 ```bash
 # Read the attestation back from the chain
-ligate query attestation $SCHEMA:lph1...
+ligate query attestation $ATTID
 # {
 #   "schema_id": "lsc1...",
 #   "payload_hash": "lph1...",
@@ -238,7 +241,7 @@ also:
 
 2. Recompute `payload_hash` from your local `payload.bin` and
    compare. `sha256sum payload.bin` should match the chain's
-   `payload_hash` (after hex ↔ bech32m conversion).
+   `payload_hash` (after hex to bech32m conversion).
 3. Recompute each signature over `SignedAttestationPayload`
    (`schema_id ‖ payload_hash ‖ submitter ‖ timestamp`) using each
    signer's pubkey from the schema's AttestorSet. The

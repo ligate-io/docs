@@ -143,10 +143,9 @@ ligate sign-attestation \
   > signatures.json
 
 # 4. Submit
-PAYLOAD_HASH=$(sha256sum payload.bin | awk '{print $1}')
 ligate submit-attestation \
   --schema lsc1... \
-  --payload-hash lph1...$(...convert hex to bech32m...) \
+  --payload-hash lph1... \
   --signatures signatures.json \
   --signer alice
 # → returns lat1...
@@ -157,11 +156,12 @@ quorum, see [Themisra integration](/themisra/api).
 
 ## Verify it
 
-Anyone can verify a receipt by querying the chain. The on-chain
-record is keyed by `(schema_id, payload_hash)`:
+Anyone can verify a receipt by querying the chain. Ids derive
+deterministically from `(schema_id, payload_hash)`, but consumers
+use the bech32m `lat1...` form:
 
 ```bash
-ligate query attestation <schemaId>:<payloadHash>
+ligate query attestation lat1...
 # returns the Attestation: submitter, timestamp, signatures
 ```
 

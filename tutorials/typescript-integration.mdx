@@ -33,7 +33,7 @@ the node to handle hard-fork bumps gracefully.
 ```bash
 mkdir my-attested-chat && cd my-attested-chat
 pnpm init
-pnpm add @ligate-labs/sdk@rc
+pnpm add @ligate-labs/sdk
 ```
 
 ## Step 2: Generate or load a service key
@@ -239,7 +239,7 @@ const chain = new LigateClient({ rpcUrl: RPC_URL })
 const api = new LigateClient({ rpcUrl: 'https://api.ligate.io' })
 
 app.get('/verify/:attestationId', async (req, res) => {
-  const id = req.params.attestationId  // <lsc1...>:<lph1...>
+  const id = req.params.attestationId  // bech32m string, e.g. 'lat1...'
   try {
     // 1. On-chain existence check
     const attestation = await chain.getJson(`/modules/attestation/attestations/${id}`)
