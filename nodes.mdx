@@ -82,9 +82,9 @@ The public devnet config lives at
 [`devnet-1/`](https://github.com/ligate-io/ligate-chain/tree/main/devnet-1)
 in the chain repo. Two files matter:
 
-- **`devnet-1/celestia.toml`** — rollup config: chain identity, DA
+- **`devnet-1/celestia.toml`**, rollup config: chain identity, DA
   layer, storage paths, sequencer endpoint
-- **`devnet-1/genesis/`** — one JSON per runtime module (accounts,
+- **`devnet-1/genesis/`**, one JSON per runtime module (accounts,
   attestation, attester_incentives, bank, chain_state,
   operator_incentives, prover_incentives, sequencer_registry)
 
@@ -129,7 +129,7 @@ REST binds to `127.0.0.1:12346` for local dev,
 # Liveness (always 200 if the binary is alive)
 curl http://127.0.0.1:12346/health
 
-# Readiness — 200 once synced, 503 while syncing
+# Readiness, 200 once synced, 503 while syncing
 curl http://127.0.0.1:12346/ready
 
 # Chain identity
@@ -153,12 +153,12 @@ quarantines existing state, and restores. Full procedure:
 
 ## Monitor
 
-- **`/metrics`** on `:9100` (separate port) — Prometheus surface. Key
+- **`/metrics`** on `:9100` (separate port), Prometheus surface. Key
   series: `ligate_state_db_size_bytes`, `ligate_da_blocks_processed_total`,
   `ligate_unconfirmed_txs`, plus standard process / runtime metrics.
-- **`/health`** + **`/ready`** on the REST port — orchestrator probes
+- **`/health`** + **`/ready`** on the REST port, orchestrator probes
   (Kubernetes liveness + readiness).
-- **Logs** — JSON-structured, level-tunable via `RUST_LOG`.
+- **Logs**, JSON-structured, level-tunable via `RUST_LOG`.
 
 ## Known limitations (devnet)
 
