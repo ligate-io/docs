@@ -114,10 +114,14 @@ curl 'https://api.ligate.io/v1/drip/status?address=lig1qxk7r4z9...'
 Rate-limited per recipient address; each address can drip once per
 24 h window. Restart resets the in-memory window state.
 
-The CLI's `ligate faucet` currently calls the legacy hostname
-`faucet.ligate.io/faucet` by default. Both endpoints back the same
-primitive; the next CLI release switches to `api.ligate.io/v1/drip`
-directly.
+The CLI's `ligate faucet` currently hardcodes
+`https://faucet.ligate.io/faucet` as its default and that hostname
+no longer resolves (the standalone `ligate-io/faucet` repo was
+archived in favour of this endpoint). The CLI's `--faucet-url` flag
+also hardcodes `/faucet` as the path suffix, so it can't reach
+`/v1/drip` even with an override. Until the next CLI release fixes
+the default, `curl` against `api.ligate.io/v1/drip` (above) is the
+working path.
 
 ## Chain identity
 
