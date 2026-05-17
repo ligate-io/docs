@@ -44,6 +44,10 @@
             "pages": ["introduction", "quickstart", "devnet"]
           },
           {
+            "group": "Tutorials",
+            "pages": ["tutorials/first-attestation", "tutorials/typescript-integration"]
+          },
+          {
             "group": "Protocol",
             "pages": ["architecture", "chain", "proof-of-prompt", "tokenomics"]
           },

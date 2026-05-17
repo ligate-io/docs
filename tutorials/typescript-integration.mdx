@@ -1,0 +1,293 @@
+---
+title: 'TypeScript integration walkthrough'
+sidebarTitle: 'TypeScript app'
+description: 'End-to-end Node.js example: wire @ligate-labs/sdk into an existing chat app, sign attestations from a server, query inclusion, expose a verification endpoint. Real code, real chain.'
+---
+
+A Node.js walkthrough that adds Themisra attestation to an existing
+chat app. Uses [`@ligate-labs/sdk`](/js) directly, no Mneme or Iris
+required. The pattern generalises to any HTTP server in
+TypeScript / JavaScript.
+
+<Tip>
+  This is the **server-side proxy** pattern from
+  [Themisra integration](/themisra/api#3-server-side-proxy). The
+  service holds one signing key; users never manage `$LGT` or
+  wallets.
+</Tip>
+
+## Prerequisites
+
+```bash
+node --version    # 20+
+pnpm --version    # any recent
+```
+
+A `$LGT`-funded service key (we'll generate one from a known hex).
+The chain identity values (chain_id, chain_hash, token_id) live in
+constants the SDK ships with, but you'll fetch chain_hash live from
+the node to handle hard-fork bumps gracefully.
+
+## Step 1: Install the SDK
+
+```bash
+mkdir my-attested-chat && cd my-attested-chat
+pnpm init
+pnpm add @ligate-labs/sdk@rc
+```
+
+## Step 2: Generate or load a service key
+
+For this tutorial, generate one then fund it via the CLI's faucet.
+In production, your service key lives in a secret store (Vault, AWS
+Secrets Manager, etc.) and is loaded at boot.
+
+```ts
+// keypair-gen.ts
+import { generateKeypair, bytesToHex } from '@ligate-labs/sdk'
+import { writeFileSync } from 'node:fs'
+
+const kp = generateKeypair()
+console.log('address:', kp.address)
+console.log('privateKeyHex:', kp.privateKeyHex)
+console.log('publicKey:', bytesToHex(kp.publicKey))
+
+writeFileSync('service-key.json', JSON.stringify({
+  privateKeyHex: kp.privateKeyHex,
+  publicKey: bytesToHex(kp.publicKey),
+  address: kp.address,
+}, null, 2))
+```
+
+Run + fund:
+
+```bash
+pnpm tsx keypair-gen.ts > /dev/null
+SERVICE_ADDR=$(jq -r .address service-key.json)
+ligate faucet $SERVICE_ADDR
+```
+
+## Step 3: Build a payload + submit attestation
+
+```ts
+// submit.ts
+import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import {
+  LigateClient,
+  hexToBytes,
+  submitAttestation,
+  signAttestation,
+  keypairFromPrivateKey,
+} from '@ligate-labs/sdk'
+
+const RPC_URL = 'https://rpc.ligate.io'
+const CHAIN_ID = 4242n
+const SCHEMA_ID = process.env.SCHEMA_ID!         // your registered lsc1...
+const PROOF_OF_PROMPT_SCHEMA = 'themisra.proof-of-prompt/v1'
+
+interface ChatExchange {
+  prompt: string
+  response: string
+  modelId: string
+  userDid: string
+  createdAt: string  // RFC 3339
+}
+
+function canonicalize(s: string): Buffer {
+  // NFC-normalised Unicode, LF line endings, no leading/trailing whitespace.
+  return Buffer.from(s.normalize('NFC').replace(/\r\n/g, '\n').trim(), 'utf8')
+}
+
+function sha256Hex(buf: Buffer): string {
+  return createHash('sha256').update(buf).digest('hex')
+}
+
+function buildPayload(x: ChatExchange) {
+  return {
+    spec_version: '1.0.0',
+    user_did: x.userDid,
+    model_id: x.modelId,
+    prompt_hash: sha256Hex(canonicalize(x.prompt)),
+    response_hash: sha256Hex(canonicalize(x.response)),
+    created_at: x.createdAt,
+  }
+}
+
+async function attest(exchange: ChatExchange) {
+  // Load key
+  const keyFile = JSON.parse(readFileSync('service-key.json', 'utf8'))
+  const service = keypairFromPrivateKey(keyFile.privateKeyHex)
+
+  // Build canonical payload + hash it (Borsh hash done by SDK)
+  const payload = buildPayload(exchange)
+  const payloadJson = JSON.stringify(payload)
+  // The chain expects payload_hash = sha256(canonical Borsh of the
+  // SignedAttestationPayload). For schemas the chain doesn't decode
+  // the payload itself, only the hash of the canonical bytes.
+  const payloadHashHex = sha256Hex(Buffer.from(payloadJson))
+
+  // Chain state
+  const chain = new LigateClient({ rpcUrl: RPC_URL })
+  const info = await chain.getRollupInfo()
+  const nonce = await chain.getNonce(service.publicKey)
+
+  // Get attestor signatures. For Themisra: HTTP-POST the canonical
+  // digest to the Themisra attestor-set's signing service, which
+  // returns each attestor's AttestorSignature. For your own 1-of-1
+  // set: sign locally.
+  const sig = signAttestation({
+    privateKey: keyFile.privateKeyHex,
+    schemaId: SCHEMA_ID,
+    payloadHashHex,
+    submitter: service.address,
+    timestamp: BigInt(Math.floor(Date.now() / 1000)),
+  })
+
+  // Submit
+  const result = await submitAttestation({
+    rpcUrl: RPC_URL,
+    privateKey: keyFile.privateKeyHex,
+    publicKey: service.publicKey,
+    schemaId: SCHEMA_ID,
+    payloadHashHex,
+    signatures: [sig],
+    nonce,
+    chainId: CHAIN_ID,
+    chainHash: info.chain_hash,
+  })
+
+  return {
+    attestationId: result.attestationId,
+    txHash: result.txHash,
+    included: result.included,
+    payload, // store off-chain for later verification
+  }
+}
+
+// Demo
+const example: ChatExchange = {
+  prompt: 'Explain Borsh in two sentences.',
+  response: 'Borsh is a binary serialisation format from the Near/Solana ecosystem. It produces deterministic, compact byte representations for canonical hashing and signing.',
+  modelId: 'anthropic/claude-opus:4.7',
+  userDid: 'did:lig:lig1user...',
+  createdAt: new Date().toISOString(),
+}
+
+attest(example).then((r) => console.log(JSON.stringify(r, null, 2)))
+```
+
+## Step 4: Wire as an HTTP endpoint
+
+The reusable shape: a `POST /attest` your client app hits after
+each LLM interaction.
+
+```ts
+// server.ts
+import express from 'express'
+import { z } from 'zod'
+
+const app = express()
+app.use(express.json())
+
+const ChatExchangeSchema = z.object({
+  prompt: z.string(),
+  response: z.string(),
+  modelId: z.string(),
+  userDid: z.string(),
+  createdAt: z.string(),
+})
+
+app.post('/attest', async (req, res) => {
+  try {
+    const exchange = ChatExchangeSchema.parse(req.body)
+    const result = await attest(exchange)
+    res.json(result)
+  } catch (e) {
+    res.status(400).json({ error: String(e) })
+  }
+})
+
+app.listen(3001, () => console.log('attest service on 3001'))
+```
+
+Frontend call:
+
+```ts
+const r = await fetch('http://localhost:3001/attest', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({
+    prompt: userPrompt,
+    response: assistantResponse,
+    modelId: 'anthropic/claude-opus:4.7',
+    userDid: 'did:lig:' + userAddress,
+    createdAt: new Date().toISOString(),
+  }),
+})
+const { attestationId } = await r.json()
+// Show the user: "Verified on Ligate. View: explorer.ligate.io/attestation/{attestationId}"
+```
+
+## Step 5: Verify endpoint
+
+```ts
+// verify.ts
+import { LigateClient } from '@ligate-labs/sdk'
+
+const chain = new LigateClient({ rpcUrl: RPC_URL })
+const api = new LigateClient({ rpcUrl: 'https://api.ligate.io' })
+
+app.get('/verify/:attestationId', async (req, res) => {
+  const id = req.params.attestationId  // <lsc1...>:<lph1...>
+  try {
+    // 1. On-chain existence check
+    const attestation = await chain.getJson(`/modules/attestation/attestations/${id}`)
+
+    // (Optional) 2. Recompute payload_hash from your stored payload
+    // and compare; 3. Recheck each signature against the schema's
+    // AttestorSet. Both are done by the SDK's verification helpers
+    // (in dev).
+
+    res.json({ valid: true, attestation })
+  } catch (e) {
+    res.status(404).json({ valid: false, error: String(e) })
+  }
+})
+```
+
+## Step 6: Deploy considerations
+
+- **Key rotation.** The service key is a hot key. Rotate by
+  registering a new attestor set + new schema version with the new
+  pubkey, deploy the new key. The old schema stays valid for its
+  past attestations.
+- **Nonce management.** `getNonce` returns the next nonce, but if
+  you have multiple workers signing in parallel, dedupe. The SDK
+  doesn't manage a nonce pool.
+- **`chain_hash` cache.** Cache `info.chain_hash` per process; it
+  only changes on a chain reset (rare, days of notice in the
+  changelog).
+- **Cost.** Each `SubmitAttestation` costs 0.001 `$LGT` default
+  per the [tokenomics](/tokenomics). At devnet faucet prices that's
+  100,000 attestations per drip.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Themisra integration patterns" icon="signature" href="/themisra/api">
+    The four integration shapes; you just did pattern #3.
+  </Card>
+
+  <Card title="JS SDK reference" icon="js" href="/js">
+    Full method surface for `LigateClient`, `submit*`, `sign*`.
+  </Card>
+
+  <Card title="Mneme dApp connector" icon="plug" href="/mneme/connector">
+    The user-signs alternative: instead of a service key, sign with the user's Mneme.
+  </Card>
+
+  <Card title="Iris MCP" icon="robot" href="/iris/mcp">
+    The agent alternative: agents don't hold keys, the relayer signs in USD.
+  </Card>
+</CardGroup>
