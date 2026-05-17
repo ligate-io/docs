@@ -62,8 +62,14 @@
           {
             "group": "Products",
             "pages": [
-              "themisra",
-              "mneme",
+              {
+                "group": "Themisra",
+                "pages": ["themisra", "themisra/api"]
+              },
+              {
+                "group": "Mneme",
+                "pages": ["mneme", "mneme/attest", "mneme/connector"]
+              },
               {
                 "group": "Iris",
                 "pages": ["iris", "iris/mcp", "iris/relayer"]

@@ -1,0 +1,154 @@
+---
+title: 'Attest with Mneme'
+sidebarTitle: 'Attest button'
+description: 'The "Attest with Mneme" button: one-click Proof of Prompt attestation injected into ChatGPT, Claude, and Gemini conversations. Content-script architecture, hash computation, sign + submit flow.'
+---
+
+The one-click "Attest with Mneme" button is the consumer surface of
+[Mneme](/mneme). The extension's content script injects a small
+button into ChatGPT, Claude, and Gemini conversations; clicking it
+hashes the prompt + response pair, signs an attestation with the
+user's local key, and submits it on-chain. The user gets back a
+verifiable `lat1...` receipt without leaving the AI tab.
+
+<Warning>
+  **Planned, ships with Mneme v1.** The architecture below is the
+  design spec. Today, the same flow runs via the
+  [CLI](/cli) (`ligate attest`) or the
+  [JS SDK](/js) (`submitAttestation`).
+</Warning>
+
+## What the user sees
+
+A small button injected next to each assistant message in the AI
+tab. States:
+
+| State        | Visual                                    | Meaning                                          |
+| ------------ | ----------------------------------------- | ------------------------------------------------ |
+| Idle         | "Attest with Mneme" + sage accent dot     | Ready to attest this prompt + response           |
+| Signing      | Spinner + "Signing..."                    | Wallet is computing hashes + signing locally     |
+| Submitting   | Spinner + "Submitting..."                 | Tx is in flight to `rpc.ligate.io`               |
+| Anchored     | Sage check + `lat1...` (clickable to explorer) | On-chain, three checks passed                |
+| Failed       | Red, with retry                           | Sequencer rejected (rare), or network failure    |
+
+Click the anchored `lat1...` and it deep-links to the [block
+explorer](https://explorer.ligate.io) so the user (or anyone they
+share the link with) can verify.
+
+## Architecture
+
+Standard browser-extension trio: content script + background script
++ popup.
+
+```
+┌──────────────────────────────┐
+│  AI tab (chatgpt / claude /  │
+│  gemini)                     │
+│                              │
+│  ┌────────────────────────┐  │
+│  │ Content script         │  │
+│  │ (detects messages,     │  │
+│  │  injects button,       │  │
+│  │  reads prompt/response)│  │
+│  └──────────┬─────────────┘  │
+└─────────────┼────────────────┘
+              │ chrome.runtime.sendMessage
+              ▼
+┌──────────────────────────────┐
+│  Background script (sw)      │
+│  ┌────────────────────────┐  │
+│  │ Wallet core            │  │
+│  │ (key in encrypted      │  │
+│  │  storage, sign locally)│  │
+│  └──────────┬─────────────┘  │
+└─────────────┼────────────────┘
+              │ HTTPS
+              ▼
+       rpc.ligate.io
+       /v1/sequencer/txs
+```
+
+The wallet key never leaves the extension's encrypted storage. The
+content script reads DOM text; the background script does all
+signing and submission.
+
+## Per-host hooks
+
+The content script knows the DOM shape of each supported AI tool:
+
+| Host            | Selector strategy                                                          |
+| --------------- | -------------------------------------------------------------------------- |
+| chat.openai.com | `[data-message-author-role]` + the role attribute (`user` / `assistant`)   |
+| claude.ai       | `[data-test-render-count]` blocks under the conversation root              |
+| gemini.google.com | `model-response` + `user-query` elements under the chat shell             |
+
+Host hooks live in
+[`@ligate-labs/mneme-content-scripts`](https://github.com/ligate-io)
+(MIT) so partner AI tools can add coverage with a pull request.
+
+## What the click does
+
+When the user clicks Attest:
+
+1. **Read** the prompt + response text from the conversation DOM
+2. **Canonicalise** both (NFC Unicode, LF line endings, no leading
+   or trailing whitespace, UTF-8)
+3. **Hash** each: `prompt_hash = sha256(canonical_prompt_bytes)`,
+   `response_hash = sha256(canonical_response_bytes)`
+4. **Build** the Themisra payload (see [Proof of Prompt](/proof-of-prompt)
+   for full field list)
+5. **Compute** `payload_hash = sha256(canonical_borsh(SignedAttestationPayload))`
+6. **Request quorum signatures** from the canonical Themisra attestor
+   set (the extension knows the set's HTTP endpoint)
+7. **Sign** the on-chain `SubmitAttestation` tx with the user's local
+   key (`borsh(UnsignedTransaction) ++ chain_hash`)
+8. **POST** to `https://rpc.ligate.io/v1/sequencer/txs`
+9. **Poll** `/v1/ledger/txs/{hash}` for inclusion
+10. **Display** the resulting `lat1...` receipt next to the message,
+    with a deep link to the explorer
+
+Step 6 may move client-side once attestor sets that use BLS land
+(v1+), simplifying the flow to just sign + submit.
+
+## Permissions
+
+The extension requests:
+
+| Permission       | Used for                                                          |
+| ---------------- | ----------------------------------------------------------------- |
+| `host_permissions` | `chat.openai.com`, `claude.ai`, `gemini.google.com` (initial three) |
+| `storage`         | Encrypted key + settings                                          |
+| `clipboard-read`  | Optional, only when user clicks "copy receipt link"              |
+
+No `tabs` permission. No `cookies` permission. The extension can't
+read other AI tabs' history or inject into pages it doesn't have
+explicit `host_permissions` for.
+
+## Privacy
+
+- **Prompt + response text never leaves the user's machine**, the
+  extension hashes locally and submits hashes
+- **Quorum sign request** sends the digest only, not the plaintext
+- **User can disable per-host** in settings if they don't want a
+  specific AI tool covered
+- **No telemetry** in v1; opt-in usage metrics post-mainnet
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Mneme overview" icon="wallet" href="/mneme">
+    Browser wallet + dApp connector + attest button, together.
+  </Card>
+
+  <Card title="dApp connector" icon="plug" href="/mneme/connector">
+    EIP-1193-style provider for dApps.
+  </Card>
+
+  <Card title="Proof of Prompt" icon="signature" href="/proof-of-prompt">
+    The receipt format the button submits.
+  </Card>
+
+  <Card title="CLI attestation (today)" icon="terminal" href="/cli">
+    Same flow, before the extension ships.
+  </Card>
+</CardGroup>
