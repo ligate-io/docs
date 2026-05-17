@@ -1,30 +1,195 @@
 ---
-title: 'Node operators'
+title: 'Run a node'
 sidebarTitle: 'Nodes'
-description: 'Run an attestor on ligate-devnet-1. Hardware requirements, Docker image, stake, and slashing. Earn testnet $LGT and position as a day-one operator on mainnet.'
+description: 'Run a Ligate node against ligate-devnet-1. Hardware requirements, install paths, configuration, bring-up, monitoring. Sequencer vs follower roles.'
 ---
 
-<Info>
-  This page is in active migration. Until then, see the
-  [devnet status](/devnet) or
-  [contact us](mailto:hello@ligate.io) for operator onboarding.
-</Info>
+`ligate-node` is the single binary that runs the chain. Two roles share
+the same binary and chain state, differing only in DA layer and whether
+they accept transaction submissions.
 
-Attestor nodes (followers) sign Proof of Prompt receipts and post blobs
-to Celestia. Running one on devnet earns testnet `$LGT` and positions
-you as a day-one operator when mainnet opens.
+| Role         | Accepts tx submissions? | DA layer                   | Hardware  |
+| ------------ | ----------------------- | -------------------------- | --------- |
+| **Sequencer**| Yes                     | Celestia Mocha (devnet)    | `e2-standard-4` |
+| **Follower** | No (503s, points caller at sequencer) | Same DA, reads | `e2-medium` |
 
-Reference shape from the public devnet deploy runbook
-([`public-devnet-deploy.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/public-devnet-deploy.md)):
+The public devnet runs a single curated sequencer (Ligate Labs).
+Anyone can run a follower. Leader rotation and a permissionless
+validator set both ship at v1.
 
-| Role      | GCP shape       | vCPU | RAM   | Boot disk | Data disk |
-| --------- | --------------- | ---- | ----- | --------- | --------- |
-| Sequencer | `e2-standard-4` | 4    | 16 GB | 20 GB SSD | 150 GB SSD |
-| Follower  | `e2-medium`     | 2    | 4 GB  | 20 GB SSD | 100 GB SSD |
+## Hardware
 
-OS: **Ubuntu 24.04 LTS** (the released `ligate-node` binary links against
-GLIBC 2.39; Debian 12 ships GLIBC 2.36 and won't load it without
-rebuilding from source).
+Reference shape from the
+[`public-devnet-deploy.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/public-devnet-deploy.md)
+runbook:
 
-Full operator guide (Docker, Grafana, stake + slashing, runbook) lands
-in the next migration pass.
+| Role      | GCP shape       | vCPU | RAM   | Boot disk | Data disk   | $/mo (sustained) |
+| --------- | --------------- | ---- | ----- | --------- | ----------- | ---------------- |
+| Sequencer | `e2-standard-4` | 4    | 16 GB | 20 GB SSD | 150 GB SSD  | ~135 USD         |
+| Follower  | `e2-medium`     | 2    | 4 GB  | 20 GB SSD | 100 GB SSD  | ~30 USD          |
+
+Sequencer headroom covers `ligate-node` + co-located Celestia light
+node + local backup snapshot stage. Follower drops the snapshot stage
+(it can restore from GCS or replay from DA if state is lost).
+
+<Note>
+  OS: **Ubuntu 24.04 LTS**. The released `ligate-node` binary links
+  against GLIBC 2.39; Debian 12 ships GLIBC 2.36 and won't load the
+  binary without rebuilding from source.
+</Note>
+
+Persistent data disk supports **live resize** via `gcloud compute
+disks resize` + `resize2fs /dev/sdb`; ext4 grows online without
+downtime.
+
+## Install
+
+### Pre-built binary (recommended)
+
+Each tagged release attaches a Linux x86_64 binary. From a fresh
+Ubuntu VM:
+
+```bash
+LIGATE_VERSION=v0.1.2-devnet  # or whatever's latest
+curl -L -o ligate-node.tar.gz \
+  https://github.com/ligate-io/ligate-chain/releases/download/$LIGATE_VERSION/ligate-node-$LIGATE_VERSION-linux-amd64.tar.gz
+tar -xzf ligate-node.tar.gz
+sudo mv ligate-node /usr/local/bin/
+ligate-node --version
+```
+
+### From source
+
+When you want to track `main` or your platform has no pre-built
+binary:
+
+```bash
+sudo apt install -y libclang-dev clang  # Ubuntu/Debian
+# macOS first install: xcode-select --install
+
+git clone https://github.com/ligate-io/ligate-chain
+cd ligate-chain
+cargo build --release --bin ligate-node
+# Built binary at: target/release/ligate-node
+```
+
+Expect 10-15 min cold-cache, ~5 min warm. Pulls ~3 GiB of Rust git
+deps.
+
+## Configure
+
+The public devnet config lives at
+[`devnet-1/`](https://github.com/ligate-io/ligate-chain/tree/main/devnet-1)
+in the chain repo. Two files matter:
+
+- **`devnet-1/celestia.toml`**, rollup config: chain identity, DA
+  layer, storage paths, sequencer endpoint
+- **`devnet-1/genesis/`**, one JSON per runtime module (accounts,
+  attestation, attester_incentives, bank, chain_state,
+  operator_incentives, prover_incentives, sequencer_registry)
+
+Clone the chain repo to get them:
+
+```bash
+git clone https://github.com/ligate-io/ligate-chain
+cd ligate-chain
+```
+
+Production deploys override secrets via env vars; never commit them.
+
+## Boot
+
+```bash
+SOV_CELESTIA_RPC_URL=ws://127.0.0.1:26658 \
+SOV_CELESTIA_GRPC_URL=http://127.0.0.1:9090 \
+SOV_CELESTIA_SIGNER_KEY=$(pass celestia/devnet-1-signer) \
+ligate-node \
+    --da-layer celestia \
+    --rollup-config-path devnet-1/celestia.toml \
+    --genesis-config-dir devnet-1/genesis
+```
+
+This assumes a co-located Celestia light node at the default RPC +
+gRPC ports. The light-node setup is covered in the
+[Celestia light node runbook](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/runbooks/celestia-light-node.md).
+
+For local development against `MockDa` (no Celestia required), boot
+from the simpler `devnet/` config:
+
+```bash
+ligate-node  # picks up devnet/rollup.toml + devnet/genesis by default
+```
+
+REST binds to `127.0.0.1:12346` for local dev,
+`https://rpc.ligate.io` in production.
+
+## Verify
+
+```bash
+# Liveness (always 200 if the binary is alive)
+curl http://127.0.0.1:12346/health
+
+# Readiness, 200 once synced, 503 while syncing
+curl http://127.0.0.1:12346/ready
+
+# Chain identity
+curl http://127.0.0.1:12346/v1/rollup/info
+# {"chain_id":"ligate-devnet-1","chain_hash":"<64 hex>","version":"0.1.2"}
+```
+
+## Bootstrap from snapshot
+
+Replaying every Celestia block from genesis takes hours on first
+sync. Faster: import a public daily snapshot.
+
+```bash
+sudo /opt/ligate/scripts/import-snapshot.sh
+```
+
+The script fetches `latest-daily.json` for the chain, downloads the
+RocksDB tarball + manifest, verifies SHA-256, stops `ligate-node`,
+quarantines existing state, and restores. Full procedure:
+[`follower-bootstrap.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/follower-bootstrap.md).
+
+## Monitor
+
+- **`/metrics`** on `:9100` (separate port), Prometheus surface. Key
+  series: `ligate_state_db_size_bytes`, `ligate_da_blocks_processed_total`,
+  `ligate_unconfirmed_txs`, plus standard process / runtime metrics.
+- **`/health`** + **`/ready`** on the REST port, orchestrator probes
+  (Kubernetes liveness + readiness).
+- **Logs**, JSON-structured, level-tunable via `RUST_LOG`.
+
+## Known limitations (devnet)
+
+- **Single sequencer.** Followers don't propagate submitted txs; the
+  follower's `/v1/sequencer/txs` endpoint accepts but the blob is
+  filtered at the STF level (DA address not in registry). Point
+  clients at `https://rpc.ligate.io` for submissions.
+- **No automated DA bridging.** The Celestia signer key is operator-
+  managed.
+- **Curated validator set.** Permissionless validator entry with
+  economic stake lands at v1 alongside the
+  [`disputes`](https://github.com/ligate-io/ligate-chain/issues/51)
+  module.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Public devnet deploy runbook" icon="server" href="https://github.com/ligate-io/ligate-chain/blob/main/docs/development/public-devnet-deploy.md">
+    Step-by-step VM provisioning, cloud-init, Caddy + TLS, bring-up,
+    monitoring. The canonical operator doc.
+  </Card>
+
+  <Card title="Follower bootstrap" icon="download" href="https://github.com/ligate-io/ligate-chain/blob/main/docs/development/follower-bootstrap.md">
+    Import a snapshot, skip the multi-hour replay.
+  </Card>
+
+  <Card title="Operations runbooks" icon="book" href="/operators">
+    Backup + restore, key rotation, alerts, log shipping.
+  </Card>
+
+  <Card title="Source" icon="github" href="https://github.com/ligate-io/ligate-chain">
+    `ligate-chain` repo.
+  </Card>
+</CardGroup>

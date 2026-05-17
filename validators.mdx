@@ -1,0 +1,98 @@
+---
+title: 'Validators'
+sidebarTitle: 'Validators'
+description: 'Permissionless validator entry, attestor-set staking, and Proof of Useful Attestation. v3 mainnet activates PoUA from genesis; pre-mainnet validator set is curated.'
+---
+
+The validator role on Ligate Chain is bonded stake plus a
+non-transferable reputation score earned from processing valid
+attestations. The mechanism is called **Proof of Useful Attestation
+(PoUA)** and it activates from genesis at v3 mainnet. Pre-mainnet
+(v0 through v2), the chain runs as stake-only Proof of Stake while
+the mechanism is finalised, externally reviewed, and validated
+through simulation and devnet operation.
+
+<Warning>
+  **Pre-mainnet state.** Validator entry today is curated and
+  coordinated with Ligate Labs over chat. Permissionless validator
+  entry with economic stake lands at v1 alongside the
+  [`disputes`](https://github.com/ligate-io/ligate-chain/issues/51)
+  module. This page is forward-looking.
+</Warning>
+
+## Roles, today
+
+| Role             | Today (devnet)                           | At v1                                       | At v3 (mainnet) |
+| ---------------- | ---------------------------------------- | ------------------------------------------- | --------------- |
+| **Sequencer**    | Single, curated (Ligate Labs)            | Leader rotation or shared sequencer         | Permissionless via PoUA |
+| **Follower**     | Anyone, runs `ligate-node` locally       | Same, plus economic entry to validator      | Same, plus PoUA weight |
+| **Attestor**     | Per-schema federated set, ed25519 keys   | Stakeable via `attestor_sets` module, slashing via `disputes` | Same, plus PoUA weight contributes |
+| **Validator**    | N/A (PoS bootstrap, validator = sequencer + attesters via SDK base modules) | Permissionless entry via stake | PoUA: weight = stake × reputation |
+
+## Proof of Useful Attestation
+
+Standard Proof of Stake selects block proposers as a function of
+bonded capital alone. PoUA computes validator weight as the product
+of bonded stake and a non-transferable reputation score accrued from
+processing valid attestations and lost on detected misbehaviour.
+
+```
+validator_weight = bonded_stake × reputation_score
+```
+
+Properties (from the
+[research paper](https://github.com/ligate-io/ligate-research)):
+
+- Inherits safety and liveness from the underlying BFT primitive
+- Constructs a multiplicative cost-to-attack premium over equivalent
+  pure-stake chains
+- Reputation is non-transferable, can't be bought or accumulated
+  passively, has to be earned through actual attestation work
+- Cost-to-grind bound holds under compound capital-and-grinding
+  adversaries
+
+## Activation
+
+| Phase   | Status                                          |
+| ------- | ----------------------------------------------- |
+| v0      | Stake-only PoS, single curated sequencer        |
+| v1      | Permissionless validator entry, `disputes` module live |
+| v2      | PoUA simulation + external review               |
+| **v3**  | **PoUA activates from mainnet genesis** with a designed warmup period during which reputation accrues before entering vote weight; activation is a single governance transaction at the end of warmup, not a hard fork |
+
+## Become a validator (pre-mainnet)
+
+Pre-v1, validator entry is coordinated with Ligate Labs. If you want
+to run an attestor or join the validator set, email
+[hello@ligate.io](mailto:hello@ligate.io). At v1, the
+[`attestor_sets`](https://github.com/ligate-io/ligate-chain/blob/main/crates/modules/attestation/src/lib.rs)
+module's existing `RegisterAttestorSet` flow extends with stake +
+slashing primitives, and entry becomes a regular on-chain transaction.
+
+## Read the design
+
+- **Whitepaper**: [ligate.io/whitepaper](https://ligate.io/whitepaper)
+- **PoUA paper**: [ligate.io/poua](https://ligate.io/poua) (long-form
+  explainer)
+- **Research repo**: [github.com/ligate-io/ligate-research](https://github.com/ligate-io/ligate-research)
+  (formal spec, threat model, simulator)
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Run a node" icon="server" href="/nodes">
+    Hardware, install, configure. Every validator starts as a follower.
+  </Card>
+
+  <Card title="Operations" icon="book" href="/operators">
+    Runbooks for the day-to-day. Key rotation, backups, alerts.
+  </Card>
+
+  <Card title="Proof of Prompt spec" icon="signature" href="/proof-of-prompt">
+    The attestation work that earns PoUA reputation.
+  </Card>
+
+  <Card title="Tokenomics" icon="coins" href="/tokenomics">
+    `$LGT` supply, fees, and the staking economics PoUA scales over.
+  </Card>
+</CardGroup>
