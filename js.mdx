@@ -1,49 +1,304 @@
 ---
 title: 'JavaScript SDK'
 sidebarTitle: 'JS SDK'
-description: 'TypeScript SDK for Ligate Chain. Build, sign, submit transactions, query state, manage keys. Browser, Node, and edge-runtime compatible.'
+description: 'TypeScript SDK for Ligate Chain. Build, sign, submit transactions, register schemas, submit attestations. Browser, Node, and edge-runtime compatible. Pure ESM, no Buffer polyfill.'
 ---
 
-<Info>
-  This page is in active migration. Full API reference lands in the next
-  pass. Source:
+`@ligate-labs/sdk` is the TypeScript surface for Ligate Chain. Build,
+sign, submit transactions, register schemas, submit attestations,
+query state. Browser, Node, and edge-runtime compatible. Pure ESM,
+zero `Buffer` dependency, written against native `BigInt` + `fetch`
++ `crypto.getRandomValues`.
+
+<Tip>
+  Source:
   [github.com/ligate-io/ligate-js](https://github.com/ligate-io/ligate-js).
-</Info>
+  Examples run against a localnet:
+  [`examples/`](https://github.com/ligate-io/ligate-js/tree/main/examples).
+</Tip>
+
+## Install
 
 ```bash
+# devnet-aligned release (current ligate-devnet-1 wire format).
+# Ships under the `rc` dist-tag.
 pnpm add @ligate-labs/sdk@rc
+
+# Or pin exactly:
+pnpm add @ligate-labs/sdk@0.1.1-devnet
 ```
 
-```ts
-import {
-  generateKeypair,
-  LigateClient,
-  submitTransfer,
-} from '@ligate-labs/sdk'
+Works with `npm install` and `yarn add` interchangeably.
 
-// Generate (or load) a key. Returns { address, publicKey, privateKey }.
+## Quickstart
+
+```ts
+import { generateKeypair, LigateClient, submitTransfer } from '@ligate-labs/sdk'
+
+// Generate or load a key. { address, publicKey, privateKey, privateKeyHex }.
 const sender = generateKeypair()
 console.log('address:', sender.address)
 
-// Connect a client at the canonical devnet RPC.
-const client = new LigateClient({ rpc: 'https://rpc.ligate.io' })
+// Connect a client. The `/v1` URL prefix is auto-appended idempotently.
+const rpcUrl = 'https://rpc.ligate.io'
+const client = new LigateClient({ rpcUrl })
 
-// Build, sign, submit a 1 LGT transfer to a recipient.
-const result = await submitTransfer(client, {
-  signer: sender,
-  to: 'lig1u8z2rxh6ymjwkqsasme64f5kfphtfm2kf4kkn0clusfpr34amezsp5j7yp',
-  amount: 1_000_000_000n, // nano LGT (9 decimals): 1 LGT
+// Pull chain identity + the sender's next nonce.
+const info = await client.getRollupInfo()
+const nonce = await client.getNonce(sender.publicKey)
+
+// Build, sign, submit, wait for inclusion, one call.
+const result = await submitTransfer({
+  rpcUrl,
+  privateKey: sender.privateKeyHex,
+  publicKey: sender.publicKey,
+  to: 'lig1xyz...',
+  amountNano: 1_000_000_000n,                 // 1 $LGT
+  tokenId: 'token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7',
+  nonce,
+  chainId: 4242n,                              // from chain constants.toml
+  chainHash: info.chain_hash,
 })
 
 console.log('tx hash:', result.txHash)
+console.log('included on chain:', result.included)
 ```
 
-Runnable examples (transfer, balance polling, key generation) live in
-[`examples/`](https://github.com/ligate-io/ligate-js/tree/main/examples)
-of the SDK repo. The current attestation-building surface is being
-finalised under the same package; see
-[github.com/ligate-io/ligate-js](https://github.com/ligate-io/ligate-js)
-for what's exported today vs in flight.
+`tokenId` accepts hex, `Uint8Array`, or `token_1...` bech32m form;
+the signer and `client.getBalance` normalise internally. Same with
+`chainHash`, accepts hex or `lsch1...` bech32m.
 
-See [the chain RPC reference](/rpc) for the underlying surface this
-wraps.
+## Attestations
+
+The same submit pipeline covers Proof of Prompt attestations. Three
+calls cover the full attestation lifecycle: register attestor set,
+register schema, submit attestation.
+
+```ts
+import {
+  LigateClient,
+  keypairFromPrivateKey,
+  submitRegisterAttestorSet,
+  submitRegisterSchema,
+  submitAttestation,
+  signAttestation,
+} from '@ligate-labs/sdk'
+
+const client = new LigateClient({ rpcUrl: 'https://rpc.ligate.io' })
+const info = await client.getRollupInfo()
+const owner = keypairFromPrivateKey(process.env.LIGATE_KEY!)
+const nonce = await client.getNonce(owner.publicKey)
+
+// 1. Register a 3-of-3 attestor set (idempotent: re-runs return the
+//    existing las1... id).
+const setResult = await submitRegisterAttestorSet({
+  rpcUrl: client.rpcUrl,
+  privateKey: owner.privateKeyHex,
+  publicKey: owner.publicKey,
+  members: [pub1, pub2, pub3],   // ed25519 pubkeys
+  threshold: 3,
+  nonce,
+  chainId: 4242n,
+  chainHash: info.chain_hash,
+})
+
+// 2. Register a schema bound to that attestor set.
+const schemaResult = await submitRegisterSchema({
+  rpcUrl: client.rpcUrl,
+  privateKey: owner.privateKeyHex,
+  publicKey: owner.publicKey,
+  name: 'themisra.proof-of-prompt',
+  version: 1,
+  attestorSetId: setResult.attestorSetId,
+  feeRoutingBps: 5000,           // 50% to builder, max
+  feeRoutingAddr: owner.address,
+  payloadSpecHash: '<32-byte hex>',
+  nonce: nonce + 1n,
+  chainId: 4242n,
+  chainHash: info.chain_hash,
+})
+
+// 3. Collect M-of-N attestor signatures over the payload digest, then
+//    submit. signAttestation runs locally per attestor; submitAttestation
+//    aggregates and broadcasts.
+const sig1 = signAttestation({
+  privateKey: attestor1PrivateKey,
+  schemaId: schemaResult.schemaId,
+  payloadHash: '<32-byte hex>',
+  submitter: owner.address,
+  timestamp: BigInt(Math.floor(Date.now() / 1000)),
+})
+// ... sig2, sig3 from other attestors ...
+
+const attestation = await submitAttestation({
+  rpcUrl: client.rpcUrl,
+  privateKey: owner.privateKeyHex,
+  publicKey: owner.publicKey,
+  schemaId: schemaResult.schemaId,
+  payloadHash: '<32-byte hex>',
+  signatures: [sig1, sig2, sig3],
+  nonce: nonce + 2n,
+  chainId: 4242n,
+  chainHash: info.chain_hash,
+})
+console.log('attestation id:', attestation.attestationId)
+```
+
+## Lower-level API
+
+When the bundled `submitTransfer` doesn't fit (custom polling, batch
+builds, offline signing) compose the primitives directly:
+
+```ts
+import {
+  signTransfer,
+  submitRawTx,
+  waitForInclusion,
+  LigateClient,
+  keypairFromPrivateKey,
+} from '@ligate-labs/sdk'
+
+const client = new LigateClient({ rpcUrl: 'https://rpc.ligate.io' })
+const sender = keypairFromPrivateKey(process.env.LIGATE_KEY!)
+const nonce = await client.getNonce(sender.publicKey)
+
+// 1. Build + sign offline. Returns borsh(Transaction::V0) bytes ready
+//    for POST /v1/sequencer/txs. Pure CPU, no network.
+const bytes = signTransfer({
+  privateKey: sender.privateKeyHex,
+  publicKey: sender.publicKey,
+  to: 'lig1xyz...',
+  amountNano: 1_000_000_000n,
+  tokenId: '<64-char hex>',
+  nonce,
+  chainId: 4242n,
+  chainHash: '<64-char hex>',
+})
+
+// 2. Submit. waitForInclusion: false returns the moment the sequencer
+//    accepts the bytes, no polling.
+const { txHash } = await submitRawTx(client, bytes, {
+  waitForInclusion: false,
+})
+
+// 3. Poll separately with whatever cadence + timeout the consumer wants.
+await waitForInclusion(client, txHash, {
+  pollIntervalMs: 1000,
+  timeoutMs: 60_000,
+})
+```
+
+## Exported surface
+
+Grouped by module. Full per-symbol reference is generated from inline
+JSDoc via TypeDoc (`pnpm run docs` in the SDK repo, or grab the
+`typedoc-html` workflow artifact from a recent CI run).
+
+### Keys + signing
+
+`generateKeypair`, `keypairFromPrivateKey`, `sign`, `verify`,
+`bytesToHex`, `hexToBytes`. Type: `Keypair`.
+
+### Addresses
+
+`ADDRESS_HRP`, `ADDRESS_BYTE_LENGTH`, `PUBKEY_BYTE_LENGTH`,
+`addressBytesFromPubkey`, `addressFromPubkey`, `encodeAddress`,
+`decodeAddress`.
+
+### Token id encoding
+
+`TOKEN_HRP`, `TOKEN_ID_BYTE_LENGTH`, `tokenIdToBytes`,
+`tokenIdToBech32m`, `tokenIdToHex`, `encodeTokenIdBech32m`,
+`decodeTokenIdBech32m`.
+
+### Chain hash encoding
+
+`CHAIN_HASH_HRP`, `CHAIN_HASH_BYTE_LENGTH`, `chainHashToBytes`,
+`encodeChainHash`, `decodeChainHash`.
+
+### Attestation primitives
+
+`deriveAttestorSetId`, `deriveSchemaId`, `attestationDigest`,
+`signAttestation`, `pubkeyBech32FromPrivateKey`,
+`signRegisterAttestorSet`, `signRegisterSchema`,
+`signSubmitAttestation`, `attestationIdToHex`. Types:
+`AttestorSignature`, `AttestationDigestParams`, `SignAttestationParams`,
+`SignRegisterAttestorSetParams`, `SignRegisterSchemaParams`,
+`SignSubmitAttestationParams`.
+
+### HTTP client
+
+`LigateClient`, `appendV1`, `DEFAULT_MAX_FEE_NANO`. Types:
+`LigateClientOptions`, `RollupInfo`, `CoinsResponse`.
+
+### Submit pipeline
+
+`submitTransfer`, `submitRawTx`, `submitRegisterAttestorSet`,
+`submitRegisterSchema`, `submitAttestation`, `waitForInclusion`.
+Types: `SubmitTransferParams`, `SubmitRawTxOptions`, `SubmitResult`,
+`SubmitRegisterAttestorSetParams`, `SubmitRegisterSchemaParams`,
+`SubmitAttestationParams`.
+
+### Borsh
+
+`BorshWriter` (advanced; exported for consumers building non-bank
+transactions).
+
+## Wire-format gotchas
+
+The SDK takes care of these, but worth knowing if you're extending
+it or debugging.
+
+- **Don't pre-wrap.** `signTransfer` returns
+  `borsh(Transaction::V0(Version0))`. The chain's
+  `POST /v1/sequencer/txs` wraps in `AuthenticatorInput::Standard(...)`
+  server-side. Pre-wrapping double-wraps and the chain rejects with
+  `Cannot decompress Edwards point`
+  ([ligate-chain#245](https://github.com/ligate-io/ligate-chain/issues/245)).
+- **Address derivation is `pubkey[..28]`.** First 28 bytes of the
+  32-byte Ed25519 pubkey, bech32m-encoded with the `lig` HRP. NOT
+  `SHA-256(pubkey)[..28]`, that's how genesis-stub addresses are
+  derived from string labels, and using it for keypair-derived
+  addresses produces `CannotReserveGas("Insufficient balance")` on
+  submit.
+- **Confirmation is HTTP polling, not WebSocket.** `waitForInclusion`
+  polls `GET /v1/ledger/txs/{hash}` every 500 ms. The Sovereign
+  SDK's `wait_for_tx_processing` uses a WebSocket subscription that
+  hits a URL-parsing bug (`invalid port value`) on non-standard
+  ports
+  ([ligate-cli#8](https://github.com/ligate-io/ligate-cli/issues/8)).
+- **Signature is over `borsh(UnsignedTransaction) ++ chain_hash`.**
+  The 32-byte chain hash binds signatures to the runtime version;
+  comes from `GET /v1/rollup/info`. Without it, a signature for
+  `ligate-localnet` would also work on `ligate-devnet-1`, which the
+  chain explicitly prevents.
+
+## Compatibility
+
+- **Node 20+**, uses global `fetch`, `crypto.getRandomValues`,
+  native `BigInt`.
+- **Browsers**, any with `fetch` + `crypto.getRandomValues` (all
+  modern). The SDK avoids `Buffer` so it bundles cleanly without
+  polyfills.
+- **Edge runtimes**, Cloudflare Workers, Vercel Edge, Deno, all
+  fine, same constraints as browsers.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Source + runnable examples" icon="github" href="https://github.com/ligate-io/ligate-js">
+    Repository. `examples/` has transfer, generate-keypair, watch-balance scripts.
+  </Card>
+
+  <Card title="Chain RPC reference" icon="server" href="/rpc">
+    The 115 chain endpoints the SDK wraps.
+  </Card>
+
+  <Card title="HTTP API" icon="cube" href="/api">
+    Indexer queries, stats, faucet drip on `api.ligate.io`.
+  </Card>
+
+  <Card title="CLI (same primitives, Rust binary)" icon="terminal" href="/cli">
+    Operator + builder surface, no JS runtime needed.
+  </Card>
+</CardGroup>

@@ -1,31 +1,119 @@
 ---
 title: 'SDKs'
 sidebarTitle: 'SDKs'
-description: 'Client libraries for Ligate Chain. Python, TypeScript, Rust, and Go. Build, sign, submit transactions, query state, manage keys.'
+description: 'Client libraries for Ligate Chain. TypeScript is live; Python, Rust, and Go are planned. Every SDK wraps the same chain REST + HTTP API surface.'
 ---
 
-<Info>
-  This page is in active migration. The TypeScript SDK is the canonical
-  reference today. Other language SDKs land in subsequent waves.
-</Info>
+Client libraries for Ligate Chain. Each SDK is a thin wrapper around
+the same chain [REST surface](/rpc) (`rpc.ligate.io`) and the
+indexer [HTTP API](/api) (`api.ligate.io`). One protocol, multiple
+language ergonomics.
 
-| Language    | Package                                                        | Status         |
-| ----------- | -------------------------------------------------------------- | -------------- |
-| TypeScript  | [`@ligate-labs/sdk@rc`](https://www.npmjs.com/package/@ligate-labs/sdk) (currently `0.1.1-devnet`) | RC, live       |
-| Python      | `ligate-sdk`                                                   | Planned        |
-| Rust        | `ligate-sdk` crate                                             | Planned        |
-| Go          | `github.com/ligate-io/ligate-go`                               | Planned        |
+## Current state
 
-The TypeScript SDK is browser, Node, and edge-runtime compatible. Pure
-ESM, zero runtime dependencies on the chain repo (Borsh + Bech32m
-implemented locally).
+| Language    | Package                                                                                              | Status            |
+| ----------- | ---------------------------------------------------------------------------------------------------- | ----------------- |
+| TypeScript  | [`@ligate-labs/sdk@rc`](https://www.npmjs.com/package/@ligate-labs/sdk) (currently `0.1.1-devnet`)   | **RC, live**      |
+| Python      | `ligate-sdk`                                                                                         | Planned           |
+| Rust        | `ligate-sdk` crate                                                                                   | Planned (in CLI)  |
+| Go          | `github.com/ligate-io/ligate-go`                                                                     | Planned           |
+
+The Rust primitives already live in
+[`ligate-chain/crates/client-rs`](https://github.com/ligate-io/ligate-chain/tree/main/crates/client-rs)
+and back the [CLI](/cli). A standalone `ligate-sdk` crate splits them
+out when there's a real consumer who wants to embed.
+
+## TypeScript
+
+The canonical SDK today. Pure ESM, browser + Node + edge-runtime
+compatible. Build, sign, submit transactions, register schemas, submit
+attestations, query state.
 
 ```bash
-# devnet-aligned (rc dist-tag tracks the current ligate-devnet-1 wire format)
 pnpm add @ligate-labs/sdk@rc
-# or pin exactly
-pnpm add @ligate-labs/sdk@0.1.1-devnet
 ```
 
-Source:
+```ts
+import { generateKeypair, LigateClient, submitTransfer } from '@ligate-labs/sdk'
+
+const sender = generateKeypair()
+const client = new LigateClient({ rpcUrl: 'https://rpc.ligate.io' })
+const info = await client.getRollupInfo()
+
+const result = await submitTransfer({
+  rpcUrl: 'https://rpc.ligate.io',
+  privateKey: sender.privateKeyHex,
+  publicKey: sender.publicKey,
+  to: 'lig1xyz...',
+  amountNano: 1_000_000_000n,
+  tokenId: 'token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7',
+  nonce: await client.getNonce(sender.publicKey),
+  chainId: 4242n,
+  chainHash: info.chain_hash,
+})
+```
+
+Full reference: [JavaScript SDK](/js). Source:
 [github.com/ligate-io/ligate-js](https://github.com/ligate-io/ligate-js).
+
+## CLI
+
+Same primitives, Rust binary, no JS runtime. Operator and builder
+surface for keygen, balance queries, transfers, schema registration,
+attestation signing + submission.
+
+```bash
+# Pre-built tarball install (Linux + Apple Silicon Mac)
+curl -L -o ligate.tar.gz \
+  https://github.com/ligate-io/ligate-cli/releases/latest/download/ligate-linux-amd64.tar.gz
+tar -xzf ligate.tar.gz
+sudo mv ligate /usr/local/bin/
+```
+
+Full reference: [CLI](/cli). Source:
+[github.com/ligate-io/ligate-cli](https://github.com/ligate-io/ligate-cli).
+
+## What the SDKs DON'T do
+
+- They don't run a node. To run a node, see [Run a node](/nodes).
+- They don't host the chain API. The SDK is a client; you point it
+  at a node, a hosted RPC at `rpc.ligate.io`, or a partner-run
+  endpoint.
+- They don't sign for the user. The browser SDK is non-custodial,
+  the consumer keeps the private key.
+
+## Building a new SDK
+
+The wire format is fully specified:
+
+- **Transaction Borsh layout**: [`docs/protocol/rest-api.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/rest-api.md)
+  + [`crates/stf`](https://github.com/ligate-io/ligate-chain/tree/main/crates/stf)
+- **Address + signing**: [`docs/protocol/addresses-and-signing.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/addresses-and-signing.md)
+- **Attestation primitives**: [`crates/modules/attestation/src/lib.rs`](https://github.com/ligate-io/ligate-chain/blob/main/crates/modules/attestation/src/lib.rs)
+- **Universal-wallet TX schema**: `GET /v1/rollup/schema` on any
+  running node; typed Borsh layout of every `CallMessage` variant for
+  forward-compatible client codegen
+
+If you're building a Ligate SDK in another language and want to
+coordinate, email [hello@ligate.io](mailto:hello@ligate.io). We're
+keen on real-world consumers driving the language priorities.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="JavaScript SDK reference" icon="js" href="/js">
+    Full surface, attestation flow, wire-format gotchas, compatibility.
+  </Card>
+
+  <Card title="CLI reference" icon="terminal" href="/cli">
+    Same primitives, command-line.
+  </Card>
+
+  <Card title="Chain RPC" icon="server" href="/rpc">
+    What every SDK wraps.
+  </Card>
+
+  <Card title="HTTP API" icon="cube" href="/api">
+    Indexer queries + faucet.
+  </Card>
+</CardGroup>
