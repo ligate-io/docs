@@ -1,0 +1,185 @@
+---
+title: 'Glossary'
+sidebarTitle: 'Glossary'
+description: 'Ligate Chain terms and identifiers. Bech32m prefixes, address derivation, chain identity, attestation primitives, and the names of the things you keep seeing in docs and code.'
+---
+
+Terms and identifiers, grouped by area. If something in the docs is
+unclear, it's probably defined here.
+
+## Identifiers
+
+Every Ligate identifier is **Bech32m**-encoded with a typed
+Human-Readable Part (HRP) prefix. The HRP tells you what kind of
+thing the id points at; the body is the actual bytes.
+
+| Prefix     | Identifies                                       | Length         |
+| ---------- | ------------------------------------------------ | -------------- |
+| `lig1...`  | account address                                  | 28 bytes       |
+| `lpk1...`  | public key (when encoded standalone)             | 32 bytes       |
+| `lsc1...`  | schema id                                        | 32 bytes       |
+| `las1...`  | attestor-set id                                  | 32 bytes       |
+| `lat1...`  | attestation id                                   | 32 bytes       |
+| `ltx1...`  | transaction hash                                 | 32 bytes       |
+| `lph1...`  | payload hash                                     | 32 bytes       |
+| `lsch1...` | chain hash (canonical form, hex also accepted)   | 32 bytes       |
+| `token_1...` | token id (gas token, future custom tokens)     | 32 bytes       |
+| `lcc1...`  | NFT collection id (reserved, ships with `nft` module) | 32 bytes |
+| `ltk1...`  | fungible token denomination (reserved, ships with `tokens` module) | 32 bytes |
+
+Address derivation: the first 28 bytes of the 32-byte Ed25519 public
+key, Bech32m-encoded with the `lig` HRP. NOT `SHA-256(pubkey)[..28]`,
+that's how genesis-stub addresses are derived from string labels.
+
+## Chain identity
+
+- **`chain_id`** — Cosmos-style ladder string the user-facing surfaces
+  display (`ligate-localnet`, `ligate-devnet-1`, `ligate-testnet-N`,
+  `ligate-1`). Bumps only on a state-breaking restart.
+- **`CHAIN_ID`** (numeric) — `u64` used for tx signing domain
+  separation. Devnet: `4242`. Set in `constants.toml` in the chain
+  repo.
+- **`chain_hash`** — 32-byte build-time fingerprint of the runtime
+  composition (the universal-wallet schema). Bumps on every STF
+  change, pins the tx-signing domain so signatures don't replay
+  across runtimes.
+- **`CHAIN_HASH_OVERRIDES`** — manual overrides for upgrade
+  transitions, empty at launch.
+
+Every signature is over `borsh(UnsignedTransaction) ++ chain_hash`.
+Without the hash, a signature for one runtime would replay on
+another, which the chain explicitly prevents.
+
+## Attestation primitives
+
+- **Schema** — declares attestation shape: name, version, owner,
+  attestor set, fee routing. Borsh-encoded; the SchemaId is
+  `SHA-256(owner ‖ name ‖ version)`.
+- **AttestorSet** — quorum that must sign attestations under a
+  schema. `members: Vec<PubKey>` + `threshold: u32`. The
+  AttestorSetId is `SHA-256(sorted_members ‖ threshold)`.
+- **Attestation** — on-chain receipt. Five fields: `schema_id`,
+  `payload_hash`, `submitter`, `timestamp`, `signatures`. Write-once
+  per `(schema_id, payload_hash)`.
+- **`payload_hash`** — SHA-256 over the canonical Borsh encoding of
+  the off-chain payload (schema-specific shape). The chain stores
+  the hash, never the plaintext.
+- **`SignedAttestationPayload`** — what attestors sign over.
+  Subset: schema_id, payload_hash, submitter, timestamp.
+- **AttestorSignature** — `{pubkey, sig}`. ed25519 by default; the
+  signature byte cap leaves headroom for BLS in v1+.
+- **Threshold** — M-of-N count of valid signatures required for an
+  attestation to land. Configurable per AttestorSet at registration.
+
+## Token + economics
+
+- **`$LGT`** — the chain's gas + fee + governance token. **9
+  decimals** on the wire. 1 nano `$LGT` = `0.000000001 $LGT`.
+- **nano** — the smallest unit (one of the 9 decimal places). All
+  API amounts are in `u64` nanos.
+- **Total supply** — 1,000,000,000 `$LGT` at genesis. No
+  inflationary issuance.
+- **Default fees**:
+  - `RegisterAttestorSet` — 10 `$LGT`
+  - `RegisterSchema` — 100 `$LGT`
+  - `SubmitAttestation` — 0.001 `$LGT` per attestation
+- **`max_builder_bps`** — protocol cap on the schema-owner's share of
+  per-attestation fees. Default 5000 basis points (50%).
+- **Base fee burn** — 10% of base fee burned, rest goes to
+  provers / attesters (EIP-1559-style).
+
+## Roles
+
+- **Sequencer** — block producer; accepts transaction submissions
+  via `POST /v1/sequencer/txs`. Public devnet is single curated
+  sequencer (Ligate Labs). Leader rotation lands at v1.
+- **Follower** — read-only node. Mirrors state from DA. Submitting
+  to a follower returns 503 with a pointer at the sequencer.
+- **Attestor** — signs attestations under a schema. Membership +
+  threshold are declared in the schema's AttestorSet.
+- **Validator** — post-mainnet PoUA role. Weight =
+  `bonded_stake × reputation_score`. Pre-mainnet runs as stake-only
+  PoS.
+
+## Cryptography
+
+- **ed25519** — signature scheme used for accounts, attestors, and
+  sequencer keys. 32-byte public keys, 64-byte signatures.
+- **SHA-256** — hash function used everywhere (payload_hash,
+  schema_id derivation, attestor set id derivation).
+- **Bech32m** — encoding used for every identifier. HRP + checksum +
+  bech32m body.
+- **BLS** — alternative signature scheme; the on-chain
+  `AttestorSignature` byte cap leaves room for BLS in v1+ schemas.
+- **Borsh** — binary encoding format used for canonical
+  serialization (transactions, payloads, state).
+- **Universal-wallet TX schema** — typed Borsh layout of every
+  `CallMessage` variant, published at `GET /v1/rollup/schema`. Wallets
+  + SDKs consume it for forward-compatible tx encoding.
+
+## Stack
+
+- **Sovereign SDK** — Rust rollup framework Ligate is built on.
+  Provides the base modules (`bank`, `accounts`, `chain_state`,
+  `sequencer_registry`, `attester_incentives`, `prover_incentives`,
+  `operator_incentives`) carried unchanged in the v0 runtime.
+- **Celestia** — data availability layer. Devnet uses
+  `celestia-mocha`, mainnet uses Celestia mainnet beta.
+- **MockDa** — in-process DA backed by SQLite for local dev. Boots
+  `ligate-node` without Celestia.
+- **STF** — State Transition Function. The pure function that takes
+  current state + transaction and returns next state.
+- **DA** — Data Availability. The layer that publishes blob data so
+  followers can reconstruct chain state.
+
+## Consensus
+
+- **PoS** — Proof of Stake. Standard validator-weight-by-bonded-stake.
+  Ligate runs PoS bootstrap from v0 through v2.
+- **PoUA** — Proof of Useful Attestation. Mainnet (v3) consensus
+  mechanism. Validator weight = `bonded_stake × reputation_score`,
+  where reputation is accrued from processing valid attestations and
+  is non-transferable.
+- **BFT** — Byzantine Fault Tolerance. The safety + liveness
+  property class PoUA inherits from the underlying primitive.
+
+## Process + governance
+
+- **LIP** — Ligate Improvement Proposal. Numbered design docs in
+  [`ligate-research`](https://github.com/ligate-io/ligate-research)
+  for protocol changes. Examples: LIP-5 (Themisra proof-of-prompt
+  schema v1).
+- **Soft fork** — change that doesn't break state continuity or
+  signature validity. Ships in normal releases.
+- **Hard fork** — change to encoding, addressing, or interpretation
+  of existing state. Coordinated chain-id bump and genesis
+  regeneration.
+- **`CHAIN_HASH` guard** — auto-detector of hard forks built into
+  the chain. If two operators have different `CHAIN_HASH` values,
+  they can't transact, the chain refuses to validate cross-runtime
+  signatures.
+
+## Products
+
+- **Themisra** — first canonical schema (`themisra.proof-of-prompt v1.0.0`).
+  AI provenance receipts for humans using AI.
+- **Mneme** — first-party browser wallet (v0.5, in development).
+  Holds `$LGT`, signs every chain transaction, one-click attestation
+  from AI tabs.
+- **Iris** — MCP server + USD-billed relayer for autonomous agents
+  (planned Q4 2026 / Q1 2027).
+- **Proof of Prompt** — the receipt format Themisra uses.
+
+## URLs
+
+- **`rpc.ligate.io`** — chain REST API (point lookups, submit txs).
+  115 endpoints under `/v1/`.
+- **`api.ligate.io`** — HTTP API (faucet drip, indexer queries,
+  cached stats).
+- **`explorer.ligate.io`** — block + tx + attestation browser.
+- **`faucet.ligate.io/faucet`** — legacy faucet endpoint; CLI's
+  `ligate faucet` calls it by default. Same primitive as
+  `api.ligate.io/v1/drip`.
+- **`docs.ligate.io`** — these docs.
+- **`ligate.io`** — landing site (whitepaper, blog, changelog,
+  roadmap).

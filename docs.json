@@ -53,7 +53,7 @@
           },
           {
             "group": "Reference",
-            "pages": ["rpc", "api"]
+            "pages": ["rpc", "api", "glossary"]
           },
           {
             "group": "Operators",
@@ -61,7 +61,18 @@
           },
           {
             "group": "Products",
-            "pages": ["themisra", "mneme", "iris"]
+            "pages": [
+              "themisra",
+              "mneme",
+              {
+                "group": "Iris",
+                "pages": ["iris", "iris/mcp", "iris/relayer"]
+              }
+            ]
+          },
+          {
+            "group": "Community",
+            "pages": ["contributing"]
           }
         ]
       }

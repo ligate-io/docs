@@ -1,0 +1,156 @@
+---
+title: 'Iris relayer'
+sidebarTitle: 'Relayer'
+description: 'Iris relayer: USD-billed signing and submission service. Agents call the open-source MCP server, the hosted relayer signs and submits attestations on their behalf, and bills the parent org in dollars. Free / Pro / Enterprise pricing.'
+---
+
+The Iris relayer is the hosted half of [Iris](/iris). The
+[MCP server](/iris/mcp) calls into it; it signs and submits
+attestations to `rpc.ligate.io` on the agent's behalf, and bills the
+parent org in USD. Agents never hold wallets or `$LGT`.
+
+<Warning>
+  **Planned.** Slated for Q4 2026 / Q1 2027. Architecture, pricing,
+  and the sponsored-gas model are public; the hosted service is in
+  development. Until it ships, agents can submit attestations
+  directly via the [JavaScript SDK](/js) or the
+  [HTTP API](/api), with the parent org holding `$LGT` and managing
+  the signing key directly.
+</Warning>
+
+## Why a relayer
+
+Three things an agent shouldn't have to do:
+
+1. **Hold crypto.** Agent code shouldn't custody a private key or
+   manage a `$LGT` balance. Both are operator concerns.
+2. **Wait for chain confirmation.** Agent tool-use loops are
+   latency-sensitive; the relayer absorbs the wait + retry behind a
+   single MCP call.
+3. **Reason about fees.** Per-attestation gas pricing is a chain
+   detail. USD billing per attestation is what the parent org
+   actually wants to budget around.
+
+The relayer covers all three. The agent calls `mcp.iris.record(...)`
+and gets back an attestation id; the org sees an invoice line item.
+
+## Pricing tiers
+
+| Tier         | Monthly price  | Included attestations / mo | Throughput              | Support           |
+| ------------ | -------------- | --------------------------- | ----------------------- | ----------------- |
+| **Free**     | $0             | 1,000                       | Basic, shared rate limit | Community         |
+| **Pro**      | $49 / month    | 100,000                     | Standard, per-org limit  | Email             |
+| **Enterprise** | Talk to us   | Negotiated                  | Dedicated relayer pool   | Slack + on-call   |
+
+Overages on Free / Pro: hard-stop with a clear error from the MCP
+server. Enterprise: soft-bill with notification.
+
+Margin-positive over chain costs at every tier. The relayer pays gas
+in `$LGT`, the org pays USD. Independent of `$LGT` price for the
+billing customer.
+
+## Architecture
+
+```
+┌───────────────────┐
+│  Agent runtime    │
+│  (Claude / Cursor │
+│   / LangGraph /   │
+│   OpenAI Agents)  │
+└─────────┬─────────┘
+          │ MCP tool call
+          ▼
+┌───────────────────┐
+│  Iris MCP server  │  (MIT, npx-installable, runs in agent process)
+│  @ligate-labs/    │
+│   iris-mcp        │
+└─────────┬─────────┘
+          │ HTTPS, hot-key auth
+          ▼
+┌───────────────────┐
+│  Iris relayer     │  (SaaS, iris.ligate.io)
+│  + Stripe billing │
+│  + signer pool    │
+│  + retry / dedupe │
+└─────┬─────────────┘
+      │
+      ▼
+┌───────────────────┐    ┌────────────────────┐
+│  rpc.ligate.io    │    │  Stripe (USD)      │
+│  (chain RPC)      │    │  per-org invoices  │
+└───────────────────┘    └────────────────────┘
+```
+
+## Signer pool
+
+The relayer rotates through a pool of operator-funded `$LGT` signing
+keys. Each key:
+
+- Pre-funded at the start of a billing window
+- Topped up by Ligate Labs ops as drawdown approaches
+- Monitored via Prometheus (`iris_signer_balance_nano_lgt`,
+  `iris_signer_unconfirmed_txs`)
+
+The pool absorbs the operational complexity of "always have gas"; the
+billed org doesn't see it.
+
+## Hot-key auth
+
+The MCP server holds a **scoped hot key** (`IRIS_RELAYER_KEY`), not
+the org's master key. Properties:
+
+- Issued from the org's master key in the relayer dashboard
+- Short-lived (default 24h, max 90d)
+- Schema-scoped (per the `schemas` tool's allowlist)
+- Per-window attestation budget
+- Revocable at any time without rotating the org's master key or
+  restarting the agent
+
+Hot-key compromise costs the per-window budget, not the org's
+ability to authenticate.
+
+## Org dashboard
+
+`iris.ligate.io` (when shipped) shows:
+
+- Real-time attestation count, USD spend, queue depth
+- Allowlisted schemas, with per-schema attestation cap
+- Hot keys (issue, revoke, set TTL + scope)
+- Master key (sign-only, never displayed)
+- Invoice history + payment method (Stripe)
+- Webhook for inclusion events (optional)
+
+## Self-hosting
+
+Don't want Ligate Labs in the inference path? The MCP server is MIT
+and works against:
+
+- A self-operated relayer (point `IRIS_RELAYER_URL` at your own
+  service)
+- Direct signing (skip the relayer entirely; configure
+  `IRIS_SIGNER_PRIVATE_KEY` and let the MCP server sign + submit
+  itself)
+
+In the direct-signing mode the org pays gas in `$LGT` and forgoes
+the USD billing layer. Same chain primitives, different operational
+model.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="MCP server" icon="terminal" href="/iris/mcp">
+    The four tools: `record`, `verify`, `query`, `schemas`.
+  </Card>
+
+  <Card title="Iris overview" icon="robot" href="/iris">
+    What Iris is, both halves together.
+  </Card>
+
+  <Card title="JS SDK" icon="js" href="/js">
+    Submit attestations directly today, without Iris.
+  </Card>
+
+  <Card title="Tokenomics" icon="coins" href="/tokenomics">
+    The fee structure the relayer absorbs.
+  </Card>
+</CardGroup>
