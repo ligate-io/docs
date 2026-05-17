@@ -1,18 +1,103 @@
 ---
 title: 'Mneme'
 sidebarTitle: 'Mneme'
-description: 'Mneme is the first-party browser wallet for Ligate. ed25519 native, signs every chain transaction, ships with a one-click "Attest with Mneme" button injected into ChatGPT, Claude, and Gemini.'
+description: 'Mneme is the first-party browser wallet for Ligate. Holds $LGT, signs every chain transaction, ships with a one-click Attest with Mneme button for ChatGPT, Claude, and Gemini.'
 ---
 
-<Info>
-  This page is in active migration. Until then, see the
-  [Mneme landing page](https://mneme.xyz) or
-  [contact us](mailto:hello@ligate.io).
-</Info>
+Mneme is the first-party browser wallet for Ligate Chain.
+Non-custodial, ed25519 native, signs every transaction locally. Ships
+with a one-click "Attest with Mneme" button injected into ChatGPT,
+Claude, and Gemini, so any AI conversation can produce a verifiable
+on-chain receipt without leaving the tab.
 
-Mneme is the non-custodial browser wallet for Ligate Chain. It holds
-`$LGT`, signs transactions, and integrates one-click attestation into
-ChatGPT, Claude, and Gemini conversations.
+<Warning>
+  **Mneme is v0.5.** The chain primitives (`attestation` module,
+  `themisra.proof-of-prompt` schema) are live on `ligate-devnet-1`.
+  The browser-extension surface (standalone wallet UI + AI-tab
+  injection) is in development. Until it ships, sign-in lives inside
+  the product apps and the [CLI](/cli) covers the same operations.
+</Warning>
 
-Full developer docs (install guide, dApp connector, MetaMask compatibility)
-land in the next migration pass.
+## What Mneme is (target architecture)
+
+Two surfaces ship together:
+
+| Surface                     | What it does                                                                                  |
+| --------------------------- | --------------------------------------------------------------------------------------------- |
+| **Browser extension**       | Holds the `lig1...` key, signs `bank.transfer`, `RegisterSchema`, `SubmitAttestation` calls   |
+| **AI-tab content script**   | Injects "Attest with Mneme" into ChatGPT, Claude, Gemini. One click hashes the conversation and submits a `themisra.proof-of-prompt` attestation |
+| **dApp connector**          | EIP-1193-style provider API. Themisra, Iris, and partner web apps call `mneme.request(...)` for sign + submit |
+
+## Security model
+
+- **ed25519 keypair**, Bech32m-encoded addresses (`lig1...`). Same
+  primitive the chain uses natively.
+- **BIP-39 seed phrase** for recovery. Standard 12 or 24 words.
+- **Fully self-custodial.** Keys live in the extension's encrypted
+  storage; the user controls them. Same security model as Phantom or
+  MetaMask.
+- **MetaMask compatibility** lands at v1 alongside the chain's EVM
+  auth lane. Mneme is the canonical wallet today and stays
+  first-class after.
+
+## Today, without the extension
+
+Until Mneme ships, the same operations work via the
+[CLI](/cli) and the [JavaScript SDK](/js):
+
+```bash
+# Generate a keypair (OS keystore, mode 0600)
+ligate keys generate --name alice
+
+# Sign and submit a $LGT transfer
+ligate transfer --to lig1... --amount 0.5 --signer alice
+
+# Build, sign, submit a themisra.proof-of-prompt attestation
+ligate attest \
+  --schema themisra.proof-of-prompt/v1 \
+  --model-id "anthropic/claude-opus:4.7" \
+  --prompt "..." --response ./response.md \
+  --signer alice
+```
+
+```ts
+// Same flow from a Node service or browser app
+import { generateKeypair, submitTransfer, submitAttestation } from '@ligate-labs/sdk'
+```
+
+## Mneme dApp connector (planned)
+
+When the extension ships, dApps integrate with one snippet:
+
+```ts
+// EIP-1193-style provider, namespaced under `window.mneme`.
+if (window.mneme) {
+  const accounts = await window.mneme.request({ method: 'requestAccounts' })
+  const tx = await window.mneme.request({
+    method: 'submitAttestation',
+    params: { schemaId, payloadHash, signatures },
+  })
+}
+```
+
+Themisra, Iris, and partner schemas integrate the same way.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="CLI (today's wallet surface)" icon="terminal" href="/cli">
+    `ligate keys`, `ligate transfer`, `ligate attest` cover everything Mneme will.
+  </Card>
+
+  <Card title="JavaScript SDK" icon="js" href="/js">
+    Browser, Node, edge-runtime compatible. Same primitives, programmatic surface.
+  </Card>
+
+  <Card title="Themisra" icon="signature" href="/themisra">
+    What Mneme's one-click attestation actually submits.
+  </Card>
+
+  <Card title="Roadmap" icon="map" href="https://ligate.io/roadmap">
+    When the extension ships, MetaMask compatibility, AI-tab injection.
+  </Card>
+</CardGroup>

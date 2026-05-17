@@ -1,18 +1,131 @@
 ---
 title: 'Iris'
 sidebarTitle: 'Iris'
-description: 'Iris is an MCP server plus a USD-billed relayer. Any Claude Desktop, Cursor, LangGraph, or OpenAI Agents SDK agent gains cryptographic attestation of every action in ~10 lines of setup.'
+description: 'Iris is a Model Context Protocol server plus a USD-billed relayer for autonomous AI agents. Cryptographic attestation of every agent action in ~10 lines of setup. Agents don\'t hold wallets; the relayer signs and submits on their behalf.'
 ---
 
-<Info>
-  This page is in active migration. Until then,
-  [contact us](mailto:hello@ligate.io) for early access.
-</Info>
+Iris is a Model Context Protocol (MCP) server plus a USD-billed
+relayer for autonomous AI agents. Any Claude Desktop, Cursor,
+LangGraph, or OpenAI Agents SDK agent gains cryptographic attestation
+of every action with ~10 lines of setup. Agents don't hold wallets or
+`$LGT`; the relayer signs and submits on the agent's behalf and bills
+the parent org in USD.
 
-Iris is a Model Context Protocol server plus a USD-billed relayer for
-autonomous AI agents. Agents don't hold wallets or `$LGT`. The relayer
-signs and submits attestations on their behalf and bills their parent
-org in USD.
+<Warning>
+  **Iris is planned.** Slated for Q4 2026 / Q1 2027 after the v0
+  TypeScript SDK + canonical attestor set stabilise. The MCP spec and
+  relayer pricing model are public; the service implementation is in
+  development.
+</Warning>
 
-Full developer docs (MCP tools, relayer pricing, agent framework
-integrations) land in the next migration pass.
+## What Iris is (target architecture)
+
+Two artifacts, one purpose:
+
+| Artifact            | License | What it does                                                                          |
+| ------------------- | ------- | ------------------------------------------------------------------------------------- |
+| **MCP server**      | MIT     | Open-source. Plugs into any MCP-speaking agent framework. Exposes tools: `record`, `verify`, `query`, `schemas` |
+| **USD-billed relayer** | SaaS  | Hosted. Signs + submits the on-chain transactions the MCP server's `record` tool produces. Charges the parent org in USD, abstracts away `$LGT` |
+
+The relayer is the "sponsored gas" pattern for AI agents: agents
+prove they did things on a verifiable public chain without ever
+holding crypto.
+
+## MCP tools
+
+When an agent connects to the Iris MCP server, four tools become
+available:
+
+| Tool         | Purpose                                                                                                |
+| ------------ | ------------------------------------------------------------------------------------------------------ |
+| `record`     | Build + submit an attestation for the agent's current step. Schema-agnostic; relayer handles signing.  |
+| `verify`     | Verify an attestation id (`lat1...`) returned by another agent or party                                 |
+| `query`      | Read attestations from the [HTTP API](/api) indexer: by schema, by submitter, by time range            |
+| `schemas`    | List schemas the agent can attest under (org-scoped allowlist)                                         |
+
+## Pricing (planned)
+
+| Tier         | Monthly price | Included attestations | Throughput |
+| ------------ | ------------- | --------------------- | ---------- |
+| Free         | $0            | 1,000 / month         | Basic       |
+| Pro          | $49 / month   | 100,000 / month       | Standard    |
+| Enterprise   | Talk to us    | Negotiated            | Dedicated   |
+
+Margin-positive over chain costs at every tier. Independent of
+`$LGT` price, the agent org pays USD, the relayer covers gas.
+
+## Hot-key / master-key separation
+
+Iris uses a runtime primitive that ships as part of the v1 chain
+upgrade: **scoped delegation keys**. Agents get short-lived,
+revocable, schema-scoped keys that can sign only a specific subset of
+operations. The master key (held by the org's operator) can revoke a
+hot key at any time without touching the agent's running session.
+
+This separation is the foundation for "agents acting on a user's
+behalf" being safe: the user grants a narrow capability, the agent
+executes within it, the user revokes when done.
+
+## How an integration looks (target)
+
+```python
+# Example: Claude Desktop with Iris MCP enabled
+# .claude/mcp_servers.json
+{
+  "iris": {
+    "command": "npx",
+    "args": ["-y", "@ligate-labs/iris-mcp"],
+    "env": {
+      "IRIS_RELAYER_KEY": "sk_live_..."     # from iris.ligate.io dashboard
+    }
+  }
+}
+```
+
+```python
+# In the agent's tool-use loop, after completing a step:
+result = mcp.iris.record(
+    schema="myorg.agent-action/v1",
+    payload={
+        "agent_id": "claude-desktop-instance-42",
+        "tool_called": "filesystem.write",
+        "args_hash": sha256(args_bytes),
+        "result_hash": sha256(result_bytes),
+    },
+)
+# → returns attestation id (lat1...) the user can later verify
+```
+
+## Today, before Iris ships
+
+Agents can integrate the same primitives directly via the
+[JavaScript SDK](/js) and the [HTTP API](/api). The cost is that the
+agent's parent org has to:
+
+- Hold `$LGT`, the gas + per-attestation fees
+- Manage the signing key (either embedded, or proxied through their
+  own service)
+- Implement the attestor-set sourcing
+
+Iris removes all three. Until then, the SDK + API are everything Iris
+will wrap.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="MCP spec for Iris tools" icon="terminal" href="https://github.com/ligate-io">
+    Open-source MCP server (when published). Pre-release: contact us.
+  </Card>
+
+  <Card title="JS SDK (today's primitives)" icon="js" href="/js">
+    Submit attestations from agent code today, without Iris.
+  </Card>
+
+  <Card title="Themisra (canonical schema)" icon="signature" href="/themisra">
+    The shape Iris records by default for prompt + response receipts.
+  </Card>
+
+  <Card title="Roadmap" icon="map" href="https://ligate.io/roadmap">
+    Iris ship window, MCP feature surface, agent framework matrix.
+  </Card>
+</CardGroup>
