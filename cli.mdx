@@ -1,30 +1,29 @@
 ---
 title: 'CLI'
 sidebarTitle: 'CLI'
-description: 'The ligate command-line tool. Generate keys, claim from the faucet, transfer $LGT, register schemas and submit attestations against ligate-devnet-1.'
+description: 'The ligate command-line tool. Generate keys, claim from the faucet, transfer $LGT, register schemas and submit attestations against ligate-devnet-1. Written in Rust, no JS runtime required.'
 ---
 
-Operator and builder surface for Ligate Chain. Generate keys, claim from the
-faucet, transfer $LGT, register schemas, and submit attestations against
-`ligate-devnet-1`. Written in Rust, no JS runtime required.
+Operator and builder surface for Ligate Chain. The single `ligate`
+binary covers key management, balance queries, transfers, schema +
+attestor-set registration, attestation signing + submission, and a
+read-only query subcommand. Written in Rust, no JS runtime required.
 
 <Tip>
   Wires up against `ligate-devnet-1` out of the box. Default RPC:
   `https://rpc.ligate.io`. Latest release:
   [`v0.1.2-devnet`](https://github.com/ligate-io/ligate-cli/releases/latest).
+  Source:
+  [github.com/ligate-io/ligate-cli](https://github.com/ligate-io/ligate-cli).
 </Tip>
 
 ## Install
 
-Two paths, in preference order. **Pre-built tarball is recommended**, it is
-platform-native, has no Rust toolchain dependency, and installs in about
-thirty seconds.
-
-### 1. Pre-built tarball
+### Pre-built tarball (recommended)
 
 Each tagged release attaches platform tarballs for `linux-amd64`,
-`linux-arm64`, and `darwin-arm64`, each with a SHA-256 sidecar. Intel Mac
-(`darwin-amd64`) is not pre-built, fall back to `cargo install` below.
+`linux-arm64`, and `darwin-arm64`, each with a SHA-256 sidecar. Intel
+Mac (`darwin-amd64`) is not pre-built, fall back to `cargo install`.
 
 ```bash
 # Pick PLATFORM = linux-amd64 | linux-arm64 | darwin-arm64
@@ -35,102 +34,310 @@ sudo mv ligate /usr/local/bin/
 ligate --help
 ```
 
-### 2. Build from source
+### From source
 
-Fallback when a tagged tarball is not published for your platform, or when
-you want to track `main` ahead of a release. Linux needs `libclang-dev` for
-the chain's transitive `librocksdb-sys` build script.
+Fallback when no pre-built tarball is published for your platform, or
+when you want to track `main` ahead of a release. Linux needs
+`libclang-dev` for the chain's transitive `librocksdb-sys` build
+script.
 
 ```bash
-# Linux first install: sudo apt install -y libclang-dev clang
+# Linux first install:  sudo apt install -y libclang-dev clang
 # macOS first install:  xcode-select --install
 
-# Expect 10-15 min cold-cache, ~5 min warm. Pulls ~3 GiB of git deps.
+# 10-15 min cold cache, ~5 min warm. Pulls ~3 GiB of git deps.
 SKIP_GUEST_BUILD=1 RISC0_SKIP_BUILD_KERNELS=1 \
   cargo install --git https://github.com/ligate-io/ligate-cli
 ```
 
-The two env vars skip the Risc0 zkVM guest compile; the CLI does not run real
-proving so a mock zkVM is fine. Without them you would also need the `risc0`
-toolchain via `rzup install`.
+The two env vars skip the Risc0 zkVM guest compile; the CLI doesn't
+run real proving, so a mock zkVM is fine.
 
-## Quick start
+## Global flags
+
+Available on every subcommand:
+
+| Flag         | Env                  | Default                      | Notes                                            |
+| ------------ | -------------------- | ---------------------------- | ------------------------------------------------ |
+| `--rpc`      | `LIGATE_RPC`         | `https://rpc.ligate.io`      | The CLI appends `/v1` automatically (idempotent) |
+| `--json`     | (none)               | off                          | Machine-readable JSON output                     |
+
+Per-subcommand chain identity (only on commands that submit txs):
+
+| Flag             | Env                       | Notes                                                    |
+| ---------------- | ------------------------- | -------------------------------------------------------- |
+| `--chain-id`     | `LIGATE_CHAIN_ID`         | `u64`. Devnet: `4242`                                    |
+| `--chain-hash`   | `LIGATE_CHAIN_HASH`       | Accepts bech32m `lsch1...`, `0x`-prefixed hex, or bare 64-char hex |
+| `--token-id`     | `LIGATE_LGT_TOKEN_ID`     | Accepts bech32m `token_1...`, `0x`-prefixed hex, or bare 64-char hex |
+| `--faucet-url`   | `LIGATE_FAUCET_URL`       | Default `https://faucet.ligate.io`                       |
 
 ```bash
-# Generate a keypair (writes to OS keystore dir, mode 0600)
+# Recommended one-time setup
+export LIGATE_RPC=https://rpc.ligate.io
+export LIGATE_CHAIN_ID=4242
+export LIGATE_CHAIN_HASH=$(ligate info --json | jq -r .chain_hash)
+export LIGATE_LGT_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
+```
+
+## `ligate info`
+
+Print chain identity (`chain_id`, `chain_hash`, node `version`) for
+the configured RPC.
+
+```bash
+ligate info
+# chain_id    ligate-devnet-1
+# chain_hash  abcd...
+# version     0.1.2
+
+ligate info --json
+# {"chain_id":"ligate-devnet-1","chain_hash":"abcd...","version":"0.1.2"}
+```
+
+No flags beyond globals.
+
+## `ligate keys`
+
+Manage local ed25519 keypairs. Keys live in the OS keystore directory
+at mode 0600.
+
+| Subcommand    | Required args | Optional                                    |
+| ------------- | ------------- | ------------------------------------------- |
+| `generate`    | `--name <role>` | `--output <dir>` to override keystore dir   |
+| `list`        | (none)        | `--keystore <dir>`                          |
+| `show <name>` | role label    | `--keystore <dir>`, `--pubkey` (print `lpk1...` instead of `lig1...`) |
+
+```bash
 ligate keys generate --name alice
+# Writes <keystore>/alice.key (mode 0600) and <keystore>/alice.address
 
-# Show your address
+ligate keys list
+# alice    lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b
+
 ligate keys show alice
+# lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b
 
-# Claim a one-shot drip from the devnet faucet
-ligate faucet $(ligate keys show alice)
-
-# Check the balance arrived
-ligate balance $(ligate keys show alice) --token-id <hex>
-
-# Send some $LGT to another address. Use the devnet chain_id (4242)
-# or set LIGATE_CHAIN_ID once. Get chain_hash from `ligate info --json`.
-ligate transfer \
-    --to lig1xyz...                                                       \
-    --amount 0.5                                                          \
-    --signer alice                                                        \
-    --chain-id 4242                                                       \
-    --chain-hash $(ligate info --json | jq -r .chain_hash)                \
-    --token-id token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
+ligate keys show alice --pubkey
+# lpk1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b  (used for `register-attestor-set --members`)
 ```
 
-Every chain-identity flag also accepts an env var: `LIGATE_RPC` (default
-`https://rpc.ligate.io`), `LIGATE_CHAIN_ID`, `LIGATE_CHAIN_HASH`,
-`LIGATE_LGT_TOKEN_ID`, `LIGATE_FAUCET_URL`. Set them once in your shell
-and the flags become optional.
+## `ligate balance`
 
-## Commands
-
-The v0 surface, all wired against the live devnet:
-
-| Command                        | Purpose                                                                          |
-| ------------------------------ | -------------------------------------------------------------------------------- |
-| `ligate info`                  | One-line chain-identity check; prints `chain_id`, `chain_hash`, and node version |
-| `ligate keys`                  | Generate, show, list, delete keypairs in the OS keystore                         |
-| `ligate balance`               | Query an address's token balance                                                 |
-| `ligate transfer`              | Build, sign, submit a `bank.transfer`                                            |
-| `ligate faucet`                | Request a drip against the public devnet faucet                                  |
-| `ligate register-schema`       | Register a new attestation schema                                                |
-| `ligate register-attestor-set` | Register a quorum of attestors for a schema                                      |
-| `ligate sign-attestation`      | Sign a payload digest                                                            |
-| `ligate submit-attestation`    | Put a signed attestation on-chain                                                |
-| `ligate query`                 | Generic RPC pass-through                                                         |
-| `ligate completions`           | Emit a shell completion script (bash, zsh, fish, powershell)                     |
-
-## Shell completions
+Read the `$LGT` (or any token) balance of an address.
 
 ```bash
-# zsh (user-level)
-ligate completions zsh > ~/.local/share/zsh/site-functions/_ligate
+ligate balance lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b \
+  --token-id token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
 
-# bash (system-wide)
-ligate completions bash | sudo tee /etc/bash_completion.d/ligate
-
-# fish (user-level)
-ligate completions fish > ~/.config/fish/completions/ligate.fish
-
-# powershell, append to your $PROFILE
-ligate completions powershell >> $PROFILE
+ligate balance lig1... --token-id $LIGATE_LGT_TOKEN_ID --json
+# {
+#   "address": "lig1...",
+#   "token_id": "token_1nyl...",
+#   "amount_nano": 100000000000,
+#   "amount_lgt": 100.0
+# }
 ```
+
+## `ligate transfer`
+
+Build, sign, and submit a `bank.transfer` from a local key to another
+address.
+
+| Flag             | Required | Notes                                                  |
+| ---------------- | -------- | ------------------------------------------------------ |
+| `--to`           | yes      | Recipient `lig1...` address                            |
+| `--amount`       | one of   | Float `$LGT` (e.g. `0.5`). Conflicts with `--amount-nano` |
+| `--amount-nano`  | one of   | Integer nano-LGT. Conflicts with `--amount`            |
+| `--signer`       | one of   | Keystore role label (`--signer alice`)                 |
+| `--private-key-hex` | one of | 32-byte hex (with or without `0x`). Conflicts with `--signer` |
+| `--keystore`     | optional | Override keystore dir                                  |
+| `--chain-id`     | yes      | `u64`, env `LIGATE_CHAIN_ID`                           |
+| `--chain-hash`   | yes      | Hex or bech32m, env `LIGATE_CHAIN_HASH`                |
+| `--token-id`     | yes      | Hex or bech32m, env `LIGATE_LGT_TOKEN_ID`              |
+
+```bash
+ligate transfer \
+  --to lig1xyz... \
+  --amount 0.5 \
+  --signer alice
+# (env vars supply chain-id, chain-hash, token-id)
+```
+
+## `ligate faucet`
+
+Claim a one-shot drip from the public devnet faucet. Positional
+address argument, no signing involved.
+
+```bash
+ligate faucet lig1qxk7r4z9...
+# ✓ drip sent
+#   tx     ltx1zd2qmly…ljgth4
+#   amount 100 $LGT
+
+ligate faucet $(ligate keys show alice)
+# Common pattern: drip to a freshly-generated key
+```
+
+Override the faucet base URL with `--faucet-url` or
+`LIGATE_FAUCET_URL`. Default `https://faucet.ligate.io`.
+
+## `ligate register-attestor-set`
+
+Register a quorum of attestor public keys plus an M-of-N threshold.
+Returns the `las1...` id.
+
+| Flag             | Required | Notes                                                  |
+| ---------------- | -------- | ------------------------------------------------------ |
+| `--members`      | yes      | Comma-separated `lpk1...` public keys (order doesn't matter, the chain sorts them) |
+| `--threshold`    | yes      | `u8`, `1..=members.len()`                              |
+| signer + chain flags | yes  | Same as `transfer`                                     |
+
+```bash
+ligate register-attestor-set \
+  --members lpk1...,lpk1...,lpk1... \
+  --threshold 2 \
+  --signer alice
+# ✓ attestor set registered
+#   las1... 2-of-3
+#   tx     ltx1...
+```
+
+## `ligate register-schema`
+
+Register a schema from a JSON definition file. Returns the `lsc1...`
+id.
+
+| Flag             | Required | Notes                          |
+| ---------------- | -------- | ------------------------------ |
+| `--file`         | yes      | Path to schema definition JSON |
+| signer + chain flags | yes  | Same as `transfer`             |
+
+The JSON file shape:
+
+```json
+{
+  "name": "themisra.proof-of-prompt",
+  "version": 1,
+  "attestor_set_id": "las1...",
+  "fee_routing_bps": 5000,
+  "fee_routing_addr": "lig1...",
+  "payload_spec_hash": "<32-byte hex>"
+}
+```
+
+```bash
+ligate register-schema --file ./my-schema.json --signer alice
+# ✓ schema registered
+#   lsc1... themisra.proof-of-prompt v1
+#   tx     ltx1...
+```
+
+`fee_routing_addr` is required iff `fee_routing_bps > 0`. The
+protocol caps `fee_routing_bps` at 5000 (50%); see
+[tokenomics](/tokenomics).
+
+## `ligate sign-attestation`
+
+Sign the canonical attestation digest with a local attestor key. Each
+attestor runs this independently on their machine, then the outputs
+are concatenated into a signatures file for `submit-attestation`.
+
+| Flag                 | Required | Notes                                                  |
+| -------------------- | -------- | ------------------------------------------------------ |
+| `--schema`           | yes      | `lsc1...` schema id                                    |
+| `--payload-hash`     | one of   | `lph1...` payload hash. Conflicts with `--payload-file` |
+| `--payload-file`     | one of   | Path to raw payload bytes; CLI SHA-256s them. Conflicts with `--payload-hash` |
+| `--submitter`        | yes      | `lig1...` address that will submit the on-chain tx. Part of the canonical digest, so the signature only validates if `submit-attestation --signer` matches |
+| `--signer`           | one of   | Keystore role                                          |
+| `--private-key-hex`  | one of   | Override                                               |
+
+```bash
+# Attestor 1, on their own machine
+ligate sign-attestation \
+  --schema lsc1... \
+  --payload-file ./payload.bin \
+  --submitter lig1...your_submitter_addr... \
+  --signer attestor_1 \
+  > sig1.json
+
+# Attestor 2, on their own machine, same args
+ligate sign-attestation ... --signer attestor_2 > sig2.json
+
+# Attestor 3
+ligate sign-attestation ... --signer attestor_3 > sig3.json
+
+# Concatenate for submit
+cat sig1.json sig2.json sig3.json > signatures.json
+```
+
+## `ligate submit-attestation`
+
+Submit a threshold-signed attestation under an existing schema.
+
+| Flag             | Required | Notes                                                  |
+| ---------------- | -------- | ------------------------------------------------------ |
+| `--schema`       | yes      | `lsc1...`                                              |
+| `--payload-hash` | yes      | `lph1...`                                              |
+| `--signatures`   | yes      | Path to concatenated `sign-attestation` outputs        |
+| signer + chain flags | yes  | The `--signer` here MUST match the `--submitter` in `sign-attestation` |
+
+```bash
+ligate submit-attestation \
+  --schema lsc1... \
+  --payload-hash lph1... \
+  --signatures ./signatures.json \
+  --signer alice
+# ✓ attestation submitted
+#   lat1c3a87e…fd9a7c
+#   tx ltx1...
+```
+
+## `ligate query`
+
+Read-only lookups, no signing. Three subcommands.
+
+```bash
+ligate query schema lsc1f8a2c…r9k4b1
+# Pretty-prints the Schema JSON from the chain
+
+ligate query attestor-set las1...
+# Pretty-prints the AttestorSet JSON
+
+ligate query attestation lsc1...:lph1...
+# Compound id is `<schemaId>:<payloadHash>`
+```
+
+For list / range / aggregation queries, use the [HTTP API](/api)
+instead.
+
+## `ligate completions`
+
+Generate a shell completion script.
+
+| Shell         | Install snippet                                                  |
+| ------------- | ---------------------------------------------------------------- |
+| `bash`        | `ligate completions bash \| sudo tee /etc/bash_completion.d/ligate` |
+| `zsh`         | `ligate completions zsh > ~/.local/share/zsh/site-functions/_ligate` |
+| `fish`        | `ligate completions fish > ~/.config/fish/completions/ligate.fish` |
+| `elvish`      | `ligate completions elvish` (paste into rc file)                 |
+| `powershell`  | `ligate completions powershell >> $PROFILE`                      |
 
 ## Where to go from here
 
 <CardGroup cols={2}>
   <Card title="Source + per-command reference" icon="github" href="https://github.com/ligate-io/ligate-cli">
-    Full command surface, flag-by-flag, on GitHub.
+    Full command surface, every flag, on GitHub.
   </Card>
 
-<Card title="Browser / Node integrations" icon="js" href="/js">
-  JavaScript SDK for the same operations, browser- and Node-compatible.
-</Card>
+  <Card title="JavaScript SDK" icon="js" href="/js">
+    Same primitives in TypeScript for browser / Node integrations.
+  </Card>
 
-  <Card title="Running a full node" icon="server" href="/nodes">
-    Operator guide for ligate-node: requirements, Docker, stake + slashing.
+  <Card title="Run a full node" icon="server" href="/nodes">
+    The operator side: hardware, install, configure.
+  </Card>
+
+  <Card title="Errors + troubleshooting" icon="triangle-exclamation" href="/errors">
+    Common errors when running these commands, with fixes.
   </Card>
 </CardGroup>

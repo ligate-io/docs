@@ -29,8 +29,8 @@ schema and operates the default federated attestor set.
   schema. Attestation id format `lat1...`.
 - The TypeScript [SDK](/js) has the full `signAttestation` +
   `submitAttestation` surface. The [CLI](/cli) has
-  `ligate attest`, `ligate sign-attestation`,
-  `ligate submit-attestation`, `ligate register-schema`,
+  `ligate sign-attestation`, `ligate submit-attestation`,
+  `ligate register-schema`,
   `ligate register-attestor-set`.
 
 ## The receipt
@@ -62,22 +62,23 @@ reference: [Proof of Prompt](/proof-of-prompt).
 
 ## Submit an attestation
 
-End-to-end against `ligate-devnet-1`:
+The chain decomposes attestation into four primitive steps. The
+canonical Themisra federated attestor set + schema are already
+registered on `ligate-devnet-1`, so steps 1 + 2 are skip-able for
+the common case.
 
-```bash
-ligate attest \
-  --schema themisra.proof-of-prompt/v1 \
-  --model-id "anthropic/claude-opus:4.7" \
-  --prompt "Write a recursive descent parser in Rust" \
-  --response ./response.md \
-  --signer alice
-```
+1. Off-cli: build the canonical Themisra payload JSON (see fields
+   above), compute SHA-256 of canonical Borsh bytes → `payload_hash`.
+2. Get each Themisra attestor to sign:
+   `ligate sign-attestation --schema lsc1... --payload-hash lph1... --submitter lig1... --signer <attestor_role>`.
+3. Concatenate the signatures.
+4. Submit: `ligate submit-attestation --schema lsc1... --payload-hash lph1... --signatures sigs.json --signer alice`.
 
-The CLI canonicalises the prompt + response (NFC normalised UTF-8,
-LF line endings, stripped whitespace), computes SHA-256 of each,
-assembles the off-chain payload, hashes it to `payload_hash`,
-collects the federated attestor quorum's signatures, and submits the
-on-chain `SubmitAttestation` tx.
+For partner integrations that want a one-call wrapper, the
+[JavaScript SDK](/js) `submitAttestation` handles steps 3 + 4 (and
+helpers exist for the canonical Themisra payload). The CLI is
+deliberately decomposed so each attestor signs locally and key
+material never crosses the wire.
 
 From a service (TypeScript):
 
@@ -149,8 +150,8 @@ Full verification semantics: [Proof of Prompt, Verification](/proof-of-prompt#ve
     Full `signAttestation` + `submitAttestation` flow in TS.
   </Card>
 
-  <Card title="CLI: attest + register" icon="terminal" href="/cli">
-    `ligate attest`, `ligate register-schema`, `ligate register-attestor-set`.
+  <Card title="CLI: sign + submit + register" icon="terminal" href="/cli">
+    `ligate sign-attestation`, `ligate submit-attestation`, `ligate register-schema`, `ligate register-attestor-set`.
   </Card>
 
   <Card title="Themisra landing" icon="globe" href="https://themisra.xyz">

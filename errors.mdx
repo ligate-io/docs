@@ -1,0 +1,318 @@
+---
+title: 'Errors + troubleshooting'
+sidebarTitle: 'Errors'
+description: 'Common errors when running the CLI, submitting transactions, registering schemas, or running a node. Each entry: what you see, why it happens, how to fix.'
+---
+
+Common errors grouped by surface. Each entry is `what you see` → `why
+it happens` → `how to fix`. If you hit something that isn't here,
+file an issue at
+[github.com/ligate-io/docs/issues](https://github.com/ligate-io/docs/issues)
+so we can add it.
+
+## Chain identity
+
+### `chain_hash mismatch`
+
+**See:** `Cannot decompress Edwards point` or
+`InvalidSignature` errors when submitting any tx.
+
+**Why:** Every signature is over
+`borsh(UnsignedTransaction) ++ chain_hash`. If you signed against
+one runtime's `chain_hash` and submit to a different runtime, the
+signature won't verify.
+
+**Fix:** Refresh `chain_hash` from the node you're submitting to:
+
+```bash
+export LIGATE_CHAIN_HASH=$(ligate info --json | jq -r .chain_hash)
+```
+
+Then re-sign and re-submit.
+
+### `chain_id mismatch`
+
+**See:** `Cannot decompress Edwards point` (same shape as above; the
+chain-id is also part of the signature domain).
+
+**Why:** `--chain-id` doesn't match the node's. Devnet is `4242`.
+
+**Fix:** `export LIGATE_CHAIN_ID=4242` and re-sign.
+
+## Transaction submission
+
+### `CannotReserveGas("Insufficient balance")`
+
+**See:** Submit succeeds at the sequencer but the tx fails at the
+ledger. The address has 0 `$LGT`.
+
+**Why:** Two causes:
+
+1. The address is fresh and hasn't claimed from the faucet
+2. The address was derived from a pubkey using the wrong scheme
+   (e.g., `SHA-256(pubkey)[..28]` instead of `pubkey[..28]`, which
+   produces an address that doesn't match what `ligate keys generate`
+   wrote)
+
+**Fix for case 1:** `ligate faucet <address>` then wait one block.
+
+**Fix for case 2:** Use the address printed by
+`ligate keys show <role>` (first 28 bytes of the ed25519 pubkey,
+bech32m-encoded with HRP `lig`). Don't re-derive in client code with
+a different hash.
+
+### `Cannot decompress Edwards point`
+
+**See:** Sequencer accepts the tx but it fails decode.
+
+**Why:** Either chain hash / chain id drift (see above) OR you
+double-wrapped the tx (you should send
+`borsh(Transaction::V0)` only; the chain wraps in
+`AuthenticatorInput::Standard` server-side).
+
+**Fix:** If using the [JS SDK](/js), use `submitRawTx` or
+`submitTransfer`, NOT a pre-wrapped buffer. If hand-rolling, drop
+the `AuthenticatorInput` wrap. Tracking:
+[ligate-chain#245](https://github.com/ligate-io/ligate-chain/issues/245).
+
+### `Sequencer not ready` (503)
+
+**See:** `POST /v1/sequencer/txs` returns 503 with a body pointing
+at the upstream sequencer.
+
+**Why:** You're submitting to a follower node, not the sequencer.
+Follower nodes accept the request but the blob is filtered at the
+STF level because the DA address isn't in the registry.
+
+**Fix:** Point clients at the upstream sequencer:
+
+```bash
+export LIGATE_RPC=https://rpc.ligate.io
+```
+
+## Attestation registration
+
+These come from the `attestation` module's `AttestationError` enum.
+
+### `attestor set threshold (N) exceeds member count (M)`
+
+**Why:** `--threshold N` where `N > members.len()`.
+
+**Fix:** Set threshold to `1..=members.len()`.
+
+### `attestor set threshold must be at least 1`
+
+**Why:** `--threshold 0`.
+
+**Fix:** Threshold must be `>= 1`.
+
+### `attestor set must have at least one member`
+
+**Why:** `--members` flag was empty.
+
+**Fix:** Provide at least one `lpk1...` pubkey.
+
+### `attestor set already registered`
+
+**Why:** Same exact `(sorted_members, threshold)` was already
+registered. The attestor-set id is derived from those fields, so
+re-registering would produce the same id.
+
+**Fix:** Either reuse the existing `las1...` id (it's safe), or
+change the member list / threshold.
+
+### `schema already registered`
+
+**Why:** Same exact `(owner, name, version)` was already registered.
+The schema id is derived from these.
+
+**Fix:** Either reuse the existing `lsc1...` id, or bump `version`.
+
+### `schema references an unregistered attestor set`
+
+**Why:** The `attestor_set_id` in the schema JSON doesn't exist on-chain.
+
+**Fix:** Register the attestor set first with `register-attestor-set`,
+copy the returned `las1...` id into the schema JSON.
+
+### `fee routing bps (N) exceeds protocol cap (5000)`
+
+**Why:** `fee_routing_bps > 5000` in the schema JSON. The protocol
+caps the builder share at 50%.
+
+**Fix:** Set `fee_routing_bps <= 5000`.
+
+### `fee routing misconfigured: address and basis points must be set together or both absent`
+
+**Why:** Either `fee_routing_bps > 0` with no `fee_routing_addr`, or
+`fee_routing_addr` set with `fee_routing_bps == 0`.
+
+**Fix:** Set both or neither.
+
+## Attestation submission
+
+### `schema not found`
+
+**Why:** The `--schema` lsc1... id in `submit-attestation` doesn't
+exist on-chain.
+
+**Fix:** Verify with `ligate query schema lsc1...`. If it returns
+404, register the schema first.
+
+### `attestation already exists for this (schema_id, payload_hash)`
+
+**Why:** Attestations are write-once. Same `(schema, payload_hash)`
+can't be re-submitted.
+
+**Fix:** This usually means the prior submission landed and you're
+seeing it from a retry. Verify with
+`ligate query attestation lsc1...:lph1...`. If the existing record
+is what you wanted, you're done.
+
+### `quorum not met: N valid signatures, need M`
+
+**Why:** You submitted with fewer valid signatures than the
+attestor-set's threshold.
+
+**Fix:** Collect more `sign-attestation` outputs from attestors in
+the set and re-concatenate the signatures file before resubmitting.
+Make sure each signer's `--submitter` and the final
+`submit-attestation --signer` resolve to the same `lig1...` address.
+
+### `signature pubkey is not in the schema's attestor set`
+
+**Why:** One of the signatures in `--signatures` was produced by a
+key that isn't a member of the schema's `attestor_set`.
+
+**Fix:** Verify each attestor's pubkey is in the set via
+`ligate query attestor-set las1...`. If a signer was added or
+rotated, register a new attestor set (it gets a new id) and a new
+schema version bound to it.
+
+### `duplicate attestor pubkey in signatures`
+
+**Why:** Two entries in `--signatures` are from the same pubkey.
+
+**Fix:** Dedup the signatures file. The threshold counts distinct
+attestors.
+
+### `signature pubkey is not a valid ed25519 point`
+
+**Why:** The `pubkey` field on a signature is malformed.
+
+**Fix:** Re-run `sign-attestation`. If it persists, the keystore
+file may be corrupt.
+
+### `signature length N != expected 64 for ed25519`
+
+**Why:** Signature bytes are the wrong length. ed25519 sigs are
+exactly 64 bytes.
+
+**Fix:** Re-run `sign-attestation`. If you're hand-assembling
+signatures, fix the byte length.
+
+## Wallet / keys
+
+### `keystore role not found: <role>`
+
+**Why:** `--signer <role>` references a role that doesn't exist in
+the keystore.
+
+**Fix:** `ligate keys list` to see what's there.
+`ligate keys generate --name <role>` if missing.
+
+### `keystore directory permission denied`
+
+**Why:** Keystore file mode isn't 0600, or the keystore directory
+isn't owned by the current user.
+
+**Fix:** `chmod 600 <keystore>/*.key && chown -R $(whoami)
+<keystore>`. The CLI refuses to read keys from a world-readable
+file.
+
+## Faucet
+
+### `rate-limited: address dripped within the last 24h`
+
+**Why:** The faucet enforces 24h cooldown per recipient address.
+
+**Fix:** Wait. Or use a different address. Or, for operator / node
+runners who legitimately need more, email
+[hello@ligate.io](mailto:hello@ligate.io).
+
+### `faucet budget insufficient`
+
+**Why:** The faucet's hot signer has run out of `$LGT`. Operator
+issue.
+
+**Fix:** Wait, the operator monitor alerts on budget drawdown. If
+it persists more than an hour, ping us on Discord.
+
+## Node operation
+
+### `version GLIBC_2.39 not found`
+
+**Why:** Pre-built `ligate-node` binary links against GLIBC 2.39.
+Debian 12 ships GLIBC 2.36.
+
+**Fix:** Use Ubuntu 24.04 LTS (the released binary's build target),
+or build from source on your distro.
+
+### `Branch cla/signatures not found` (in CLA Assistant CI on PR)
+
+**Why:** The CLA bot expects a `cla/signatures` branch where
+signatures persist; on the first ever PR for a new repo, the branch
+doesn't exist yet.
+
+**Fix:** Operator one-time setup. Create the branch with an empty
+`signatures/version1/cla.json`:
+
+```bash
+git checkout --orphan cla/signatures
+git rm -rf .
+mkdir -p signatures/version1
+echo '{"signedContributors":[]}' > signatures/version1/cla.json
+git add . && git commit -m 'Bootstrap CLA signatures branch'
+git push -u origin cla/signatures
+```
+
+Then re-trigger the CLA check by commenting `recheck` on the PR.
+
+## HTTP API
+
+### `501 Not Implemented`
+
+**Why:** Should not happen on current `ligate-api` versions; the
+day-0 surface had 501-stubbed endpoints for indexer queries before
+the Postgres schema solidified.
+
+**Fix:** Re-pull. If you genuinely see a 501 on `api.ligate.io`,
+file an issue.
+
+### `429 Too Many Requests` on `/v1/drip`
+
+**Why:** Per-IP edge rate limit at Cloudflare, plus per-address
+limit in the service.
+
+**Fix:** Slow down, or batch by claiming once per address per 24h
+window.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="CLI commands" icon="terminal" href="/cli">
+    The commands that produce most of these errors.
+  </Card>
+
+  <Card title="Proof of Prompt spec" icon="signature" href="/proof-of-prompt">
+    Receipt structure errors trace back to canonical-encoding rules here.
+  </Card>
+
+  <Card title="Run a node" icon="server" href="/nodes">
+    Operator errors live there; GLIBC + sequencer-vs-follower notes.
+  </Card>
+
+  <Card title="HTTP API" icon="cube" href="/api">
+    Faucet + indexer surface errors.
+  </Card>
+</CardGroup>

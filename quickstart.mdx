@@ -60,38 +60,100 @@ five minutes.
   </Step>
 
   <Step title="Check the balance arrived">
+    `--token-id` is the bech32m gas-token id. Pass it once via env so
+    you don't have to repeat it.
+
     ```bash
-    ligate balance $(ligate keys show alice)
-    # { "amount": "100000000000", "tokenId": "..." }
+    export LIGATE_LGT_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
+
+    ligate balance $(ligate keys show alice) --json
+    # {
+    #   "address": "lig1...",
+    #   "token_id": "token_1nyl...",
+    #   "amount_nano": 100000000000,
+    #   "amount_lgt": 100.0
+    # }
     ```
 
     Amount is in nano `$LGT` (9 decimals). 100,000,000,000 nano =
     100 `$LGT`.
   </Step>
 
-  <Step title="Submit an attestation">
-    Build, sign, and submit a Proof of Prompt attestation against the
-    canonical `themisra.proof-of-prompt v1.0.0` schema. The CLI
-    handles the canonical payload encoding and threshold signing.
+  <Step title="Send your first transfer">
+    The simplest write path: a `bank.transfer`. Generate a second
+    keypair, transfer `0.5 $LGT` to it.
 
     ```bash
-    ligate attest \
-      --schema themisra.proof-of-prompt/v1 \
-      --model-id "anthropic/claude-opus:4.7" \
-      --prompt "Write a recursive descent parser in Rust" \
-      --response ./response.md \
-      --signer alice
-    # ✓ attestation lat1c3a87e…fd9a7c submitted
-    #   on-chain block 1,481,207
+    ligate keys generate --name bob
+    BOB=$(ligate keys show bob)
+
+    # Pull chain identity once.
+    export LIGATE_CHAIN_ID=4242
+    export LIGATE_CHAIN_HASH=$(ligate info --json | jq -r .chain_hash)
+
+    ligate transfer --to $BOB --amount 0.5 --signer alice
+    # ✓ transfer submitted
+    #   tx ltx1...
+    #   amount 0.5 $LGT to lig1...
     ```
 
-    Behind the scenes: the CLI canonicalises the prompt + response,
-    computes SHA-256 of each, assembles the off-chain Themisra payload
-    (including `user_did = did:lig:lig1...`), hashes the payload to
-    `payload_hash`, collects the federated attestor quorum's
-    signatures, and submits the on-chain `SubmitAttestation` tx.
+    Verify with `ligate balance $BOB`.
   </Step>
 </Steps>
+
+## Submit your first attestation
+
+Attestation is a multi-party flow: register an AttestorSet, register
+a Schema, sign with each attestor's key, submit the threshold-signed
+attestation. There's no `ligate attest` convenience, the chain
+primitives are deliberately decomposed.
+
+For a single-machine smoke test (1-of-1 attestor set with your own
+key):
+
+```bash
+# 1. Register a 1-of-1 attestor set using alice's own pubkey
+ALICE_PK=$(ligate keys show alice --pubkey)
+ligate register-attestor-set \
+  --members $ALICE_PK \
+  --threshold 1 \
+  --signer alice
+# → returns las1...
+
+# 2. Build your schema definition JSON, then register
+cat > schema.json <<EOF
+{
+  "name": "alice.smoke-test",
+  "version": 1,
+  "attestor_set_id": "las1...",
+  "fee_routing_bps": 0,
+  "payload_spec_hash": "<32-byte hex sha256 of a payload JSON-Schema>"
+}
+EOF
+ligate register-schema --file schema.json --signer alice
+# → returns lsc1...
+
+# 3. Sign a payload (alice as the only attestor)
+echo '{"hello":"world"}' > payload.bin
+ligate sign-attestation \
+  --schema lsc1... \
+  --payload-file payload.bin \
+  --submitter $(ligate keys show alice) \
+  --signer alice \
+  > signatures.json
+
+# 4. Submit
+PAYLOAD_HASH=$(sha256sum payload.bin | awk '{print $1}')
+ligate submit-attestation \
+  --schema lsc1... \
+  --payload-hash lph1...$(...convert hex to bech32m...) \
+  --signatures signatures.json \
+  --signer alice
+# → returns lat1...
+```
+
+For real Themisra attestations against the canonical federated
+quorum, see [Themisra integration](/themisra/api).
 
 ## Verify it
 
