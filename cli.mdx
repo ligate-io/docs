@@ -12,7 +12,7 @@ read-only query subcommand. Written in Rust, no JS runtime required.
 <Tip>
   Wires up against `ligate-devnet-1` out of the box. Default RPC:
   `https://rpc.ligate.io`. Latest release:
-  [`v0.1.2-devnet`](https://github.com/ligate-io/ligate-cli/releases/latest).
+  [`v0.1.3`](https://github.com/ligate-io/ligate-cli/releases/latest).
   Source:
   [github.com/ligate-io/ligate-cli](https://github.com/ligate-io/ligate-cli).
 </Tip>
@@ -69,7 +69,7 @@ Per-subcommand chain identity (only on commands that submit txs):
 | `--chain-id`     | `LIGATE_CHAIN_ID`         | `u64`. Devnet: `4242`                                    |
 | `--chain-hash`   | `LIGATE_CHAIN_HASH`       | Accepts bech32m `lsch1...`, `0x`-prefixed hex, or bare 64-char hex |
 | `--token-id`     | `LIGATE_LGT_TOKEN_ID`     | Accepts bech32m `token_1...`, `0x`-prefixed hex, or bare 64-char hex |
-| `--faucet-url`   | `LIGATE_FAUCET_URL`       | Default `https://faucet.ligate.io`                       |
+| `--faucet-url`   | `LIGATE_FAUCET_URL`       | Default `https://api.ligate.io/v1/drip`. Full POST URL (no path suffix appended; pass the whole endpoint) |
 
 ```bash
 # Recommended one-time setup
@@ -170,16 +170,18 @@ address argument, no signing involved.
 
 ```bash
 ligate faucet lig1qxk7r4z9...
-# ✓ drip sent
-#   tx     ltx1zd2qmly…ljgth4
-#   amount 100 $LGT
+# ✓ drip: 100 $LGT (100000000000 nano)
+#   tx:      ltx1zd2qmly…ljgth4
 
 ligate faucet $(ligate keys show alice)
 # Common pattern: drip to a freshly-generated key
 ```
 
-Override the faucet base URL with `--faucet-url` or
-`LIGATE_FAUCET_URL`. Default `https://faucet.ligate.io`.
+Default endpoint `https://api.ligate.io/v1/drip` (since `v0.1.3`,
+when the CLI switched off the archived `faucet.ligate.io` host,
+[ligate-cli#34](https://github.com/ligate-io/ligate-cli/issues/34)).
+Override the full POST URL with `--faucet-url` or
+`LIGATE_FAUCET_URL` to point at a self-hosted instance.
 
 ## `ligate register-attestor-set`
 
