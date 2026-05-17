@@ -54,7 +54,18 @@ ledger. The address has 0 `$LGT`.
    produces an address that doesn't match what `ligate keys generate`
    wrote)
 
-**Fix for case 1:** `ligate faucet <address>` then wait one block.
+**Fix for case 1:** drip via the working HTTP endpoint then wait
+one block:
+
+```bash
+curl -X POST https://api.ligate.io/v1/drip \
+  -H 'content-type: application/json' \
+  -d "{\"address\":\"<address>\"}"
+```
+
+The CLI's `ligate faucet` is currently broken (defaults to a dead
+hostname). See [`ligate faucet`](/cli#ligate-faucet) for the
+full state.
 
 **Fix for case 2:** Use the address printed by
 `ligate keys show <role>` (first 28 bytes of the ed25519 pubkey,

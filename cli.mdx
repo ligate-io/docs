@@ -165,8 +165,30 @@ ligate transfer \
 
 ## `ligate faucet`
 
+<Warning>
+  **Broken in current releases (≤ v0.1.2-devnet).** The CLI's
+  hardcoded default `https://faucet.ligate.io` no longer resolves
+  (the standalone `ligate-io/faucet` service was archived; the live
+  faucet is on `api.ligate.io/v1/drip`). The CLI also hardcodes
+  `/faucet` as the path suffix, so `--faucet-url` can't paper over
+  the host change either. Until the next CLI release fixes this,
+  use `curl` directly (below).
+</Warning>
+
 Claim a one-shot drip from the public devnet faucet. Positional
 address argument, no signing involved.
+
+**Working alternative** (canonical endpoint, served by
+[`ligate-api`](https://github.com/ligate-io/ligate-api)):
+
+```bash
+curl -X POST https://api.ligate.io/v1/drip \
+  -H 'content-type: application/json' \
+  -d "{\"address\":\"$(ligate keys show alice)\"}"
+# → {"tx_hash":"ltx1zd2qmly…","amount_nano":"100000000000"}
+```
+
+**Once the CLI is fixed**, the shape will be:
 
 ```bash
 ligate faucet lig1qxk7r4z9...
@@ -175,11 +197,11 @@ ligate faucet lig1qxk7r4z9...
 #   amount 100 $LGT
 
 ligate faucet $(ligate keys show alice)
-# Common pattern: drip to a freshly-generated key
 ```
 
 Override the faucet base URL with `--faucet-url` or
-`LIGATE_FAUCET_URL`. Default `https://faucet.ligate.io`.
+`LIGATE_FAUCET_URL`. Current default `https://faucet.ligate.io`
+(dead); fix in flight.
 
 ## `ligate register-attestor-set`
 

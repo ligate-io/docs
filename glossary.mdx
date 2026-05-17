@@ -177,9 +177,11 @@ another, which the chain explicitly prevents.
 - **`api.ligate.io`**, HTTP API (faucet drip, indexer queries,
   cached stats).
 - **`explorer.ligate.io`**, block + tx + attestation browser.
-- **`faucet.ligate.io/faucet`**, legacy faucet endpoint; CLI's
-  `ligate faucet` calls it by default. Same primitive as
-  `api.ligate.io/v1/drip`.
+- **`faucet.ligate.io`**, legacy faucet hostname. **No longer resolves**;
+  the standalone `ligate-io/faucet` repo was archived in favour of
+  `api.ligate.io/v1/drip`. The CLI's `ligate faucet` still defaults
+  to it and is currently broken; use `curl` against
+  `api.ligate.io/v1/drip` instead until the next CLI release.
 - **`docs.ligate.io`**, these docs.
 - **`ligate.io`**, landing site (whitepaper, blog, changelog,
   roadmap).

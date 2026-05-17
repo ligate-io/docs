@@ -25,8 +25,7 @@ for the Ligate devnet.
 | OpenAPI spec   | `https://rpc.ligate.io/v1/openapi-v3.json`                    |
 | Swagger UI     | `https://rpc.ligate.io/v1/swagger-ui`                         |
 | Explorer       | `https://explorer.ligate.io`                                         |
-| Faucet (HTTP)  | `POST https://api.ligate.io/v1/drip`, 100 `$LGT` per drip, 24h cooldown per address |
-| Faucet (CLI)   | `https://faucet.ligate.io/faucet` (legacy hostname, what the `ligate faucet` CLI calls by default) |
+| Faucet         | `POST https://api.ligate.io/v1/drip`, 100 `$LGT` per drip, 24h cooldown per address. (The legacy hostname `faucet.ligate.io` no longer resolves; the CLI's `ligate faucet` is broken until the next release picks up the new endpoint.) |
 | DA layer       | `celestia-mocha`                                                     |
 | Block time     | 1 second                                                             |
 | `$LGT` decimals | 9 (smallest unit: 1 nano `$LGT` = `0.000000001 $LGT`)               |
@@ -65,25 +64,22 @@ The faucet drips a fixed amount of testnet `$LGT` to any address once
 per 24 hours. No auth, no signing, the recipient doesn't need to hold
 the private key.
 
-CLI:
-
-```bash
-ligate keys generate --name alice
-ligate faucet $(ligate keys show alice)
-```
-
-HTTP (canonical endpoint, served by [`ligate-api`](https://github.com/ligate-io/ligate-api)):
+Working endpoint (HTTP):
 
 ```bash
 curl -X POST https://api.ligate.io/v1/drip \
   -H 'content-type: application/json' \
-  -d '{"address":"lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b"}'
+  -d "{\"address\":\"$(ligate keys show alice)\"}"
+# → {"tx_hash":"ltx1...","amount_nano":"100000000000"}
 ```
 
-The legacy hostname `https://faucet.ligate.io/faucet` (the original
-standalone `ligate-io/faucet` service, now archived) still resolves;
-the CLI's `ligate faucet` subcommand uses it by default until the next
-release switches to `api.ligate.io/v1/drip`.
+<Warning>
+  The CLI's `ligate faucet` subcommand currently hardcodes
+  `https://faucet.ligate.io/faucet` as the default endpoint, which
+  no longer resolves (the standalone faucet repo was archived; the
+  live drip is on `api.ligate.io/v1/drip`). Use `curl` until the
+  next CLI release picks up the new default.
+</Warning>
 
 Rate limits are per recipient address. If you're an operator or
 node-runner and need more, email

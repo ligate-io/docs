@@ -49,7 +49,11 @@ five minutes.
     24 hours.
 
     ```bash
-    ligate faucet $(ligate keys show alice)
+    # The CLI's `ligate faucet` is currently broken (default URL dead).
+    # Use the HTTP endpoint until the next CLI release fixes the default:
+    curl -X POST https://api.ligate.io/v1/drip \
+      -H 'content-type: application/json' \
+      -d "{\"address\":\"$(ligate keys show alice)\"}"
     # ✓ 100 $LGT sent
     #   tx ltx1zd2qmly…ljgth4
     ```
