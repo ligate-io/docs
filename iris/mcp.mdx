@@ -48,10 +48,10 @@ server, env vars for credentials.
 
 | Tool       | Input                                                                  | Returns                                  |
 | ---------- | ---------------------------------------------------------------------- | ---------------------------------------- |
-| `record`   | `{schema, payload}` — payload shape determined by the schema           | `{attestation_id, tx_hash, included}`    |
-| `verify`   | `{attestation_id}` — `lat1...` form                                    | `{valid: bool, on_chain, payload_hash, signatures}` |
-| `query`    | `{schema?, submitter?, since?, until?, limit?}` — indexer parameters   | `{attestations: [...], next_cursor}`     |
-| `schemas`  | (no args)                                                              | `{schemas: [...]}` — schemas the agent's org has allowlisted |
+| `record`   | `{schema, payload}`, payload shape determined by the schema           | `{attestation_id, tx_hash, included}`    |
+| `verify`   | `{attestation_id}`, `lat1...` form                                    | `{valid: bool, on_chain, payload_hash, signatures}` |
+| `query`    | `{schema?, submitter?, since?, until?, limit?}`, indexer parameters   | `{attestations: [...], next_cursor}`     |
+| `schemas`  | (no args)                                                              | `{schemas: [...]}`, schemas the agent's org has allowlisted |
 
 ### `record`
 
