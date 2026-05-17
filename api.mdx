@@ -1,0 +1,198 @@
+---
+title: 'HTTP API'
+sidebarTitle: 'HTTP API'
+description: 'Unified HTTP API at api.ligate.io. Faucet drip, indexer queries (blocks, transactions, addresses, schemas, attestor sets, attestations, search), and cached aggregate stats. One Rust service backing explorer.ligate.io.'
+---
+
+`api.ligate.io` is the unified HTTP service that hosts the faucet
+drip, the indexer queries, and cached aggregate stats. One Rust binary
+backed by Postgres, deploys to Railway. Replaces the now-archived
+[`ligate-io/faucet`](https://github.com/ligate-io/faucet) and the
+Rust side of
+[`ligate-io/ligate-explorer`](https://github.com/ligate-io/ligate-explorer).
+
+<Tip>
+  Use the HTTP API for **list / range / aggregation** queries. Point
+  lookups by id (one tx, one schema, one attestation, one balance)
+  also work here from the indexer, and they work directly against the
+  chain at [`rpc.ligate.io`](/rpc). The chain RPC is the source of
+  verification truth; the HTTP API is the operational query surface.
+  Source: [github.com/ligate-io/ligate-api](https://github.com/ligate-io/ligate-api).
+</Tip>
+
+## Endpoint surface
+
+### Health + identity
+
+| Path             | Returns                                                                   |
+| ---------------- | ------------------------------------------------------------------------- |
+| `GET /health`    | `200 {"status":"ok"}`                                                     |
+| `GET /v1/health` | same, namespaced                                                          |
+| `GET /v1/info`   | `chain_id`, `chain_hash`, `version`, `latest_block`, `tx_per_second`      |
+
+### Drip (faucet)
+
+| Path                   | Method | Returns                                                                                   |
+| ---------------------- | ------ | ----------------------------------------------------------------------------------------- |
+| `/v1/drip`             | POST   | Body `{address}` → `{tx_hash, amount_nano}`. Hot-key signs a `bank.transfer`.             |
+| `/v1/drip/status`      | GET    | `{drip_amount, rate_limit_secs, addresses_dripped, faucet_address}`. Optional `?address=` for per-address eligibility. |
+
+### Blocks + transactions (indexer-backed)
+
+| Path                       | Returns                                                  |
+| -------------------------- | -------------------------------------------------------- |
+| `GET /v1/blocks`           | Cursor-paginated list of latest blocks                   |
+| `GET /v1/blocks/{height}`  | Block detail by height                                   |
+| `GET /v1/txs`              | Cursor-paginated list of latest transactions             |
+| `GET /v1/txs/{hash}`       | Transaction detail by hash                               |
+
+### Addresses
+
+| Path                                | Returns                                                              |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| `GET /v1/addresses/{addr}`          | Summary: balance, recent tx count, derived activity                  |
+| `GET /v1/addresses/{addr}/txs`      | Cursor-paginated tx history for an address                           |
+
+### Schemas, attestor sets, attestations
+
+| Path                                                   | Returns                                                                  |
+| ------------------------------------------------------ | ------------------------------------------------------------------------ |
+| `GET /v1/schemas`                                      | List of registered schemas                                               |
+| `GET /v1/schemas/{id}`                                 | Schema detail (`lsc1...`)                                                |
+| `GET /v1/schemas/{id}/attestations`                    | Attestations under a schema (paginated)                                  |
+| `GET /v1/attestor-sets`                                | List of registered attestor sets                                         |
+| `GET /v1/attestor-sets/{id}`                           | Attestor-set detail (`las1...`)                                          |
+| `GET /v1/attestor-sets/{id}/attestations`              | Attestations witnessed by a set (paginated)                              |
+| `GET /v1/attestations`                                 | Cursor-paginated list of latest attestations                             |
+| `GET /v1/attestations/{id}`                            | Attestation detail (`lat1...`)                                           |
+
+### Search
+
+| Path             | Returns                                                                  |
+| ---------------- | ------------------------------------------------------------------------ |
+| `GET /v1/search` | Global search across block heights, tx hashes, addresses, schema ids, attestor-set ids, attestation ids |
+
+### Aggregate stats (cached)
+
+All cached 30 s in-process via `StatsCache` (5 s for `next-block-eta`).
+Designed for the [block explorer](https://explorer.ligate.io) and
+investor / operator dashboards.
+
+| Path                                | Returns                                                              |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| `GET /v1/stats/totals`              | Counts: blocks, txs, addresses, schemas, attestor sets, attestations |
+| `GET /v1/stats/finality`            | Current finality metrics                                             |
+| `GET /v1/stats/next-block-eta`      | Estimated time to next block (5 s cache TTL)                         |
+| `GET /v1/stats/active-addresses`    | Active address count                                                 |
+| `GET /v1/stats/new-wallets-daily`   | Daily new wallets time series                                        |
+| `GET /v1/stats/tx-rate-daily`       | Daily tx rate time series                                            |
+| `GET /v1/stats/attestations-daily`  | Daily attestation rate time series                                   |
+| `GET /v1/stats/top-holders`         | Top `$LGT` holders                                                   |
+
+## Faucet drip example
+
+```bash
+# Claim a drip
+curl -X POST https://api.ligate.io/v1/drip \
+  -H 'content-type: application/json' \
+  -d '{"address":"lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b"}'
+# → {"tx_hash":"ltx1zd2qmly…","amount_nano":"100000000000"}
+
+# Check drip configuration
+curl https://api.ligate.io/v1/drip/status
+# → {
+#     "drip_amount": "100000000000",         // nano $LGT (= 100 $LGT)
+#     "rate_limit_secs": 86400,              // 24 h cooldown per address
+#     "addresses_dripped": 1247,
+#     "faucet_address": "lig1zd9j2z6x55ydnv9m8f0pdw3vs2j8u0w5sdqeaf478dzp6s998ac"
+#   }
+
+# Per-address eligibility peek (used by the explorer faucet UI)
+curl 'https://api.ligate.io/v1/drip/status?address=lig1qxk7r4z9...'
+```
+
+Rate-limited per recipient address; each address can drip once per
+24 h window. Restart resets the in-memory window state.
+
+The CLI's `ligate faucet` currently calls the legacy hostname
+`faucet.ligate.io/faucet` by default. Both endpoints back the same
+primitive; the next CLI release switches to `api.ligate.io/v1/drip`
+directly.
+
+## Chain identity
+
+```bash
+curl https://api.ligate.io/v1/info
+# → {
+#     "chain_id": "ligate-devnet-1",
+#     "chain_hash": "abcd...",
+#     "version": "0.1.2",
+#     "latest_block": 1481207,
+#     "tx_per_second": 4.2
+#   }
+```
+
+Wraps the chain's `/v1/rollup/info` plus aggregated stats from the
+indexer (`latest_block` is the indexer head, `tx_per_second` is
+indexer-derived).
+
+## Architecture
+
+```
+┌─────────────────────────┐    ┌─────────────────────────┐
+│  ligate-explorer        │    │  Themisra / Mneme       │
+│  (Next.js, Vercel)      │    │  (partner web apps)     │
+└────────────┬────────────┘    └────────────┬────────────┘
+             │                              │
+             │     api.ligate.io            │
+             ├──────────────────────────────┤
+             ▼                              ▼
+        ┌──────────────────────────────────┐
+        │    ligate-api (Rust, Railway)    │
+        │  ┌─────────┐ ┌────────────────┐  │
+        │  │  drip   │ │   indexer      │  │
+        │  │ /v1/drip│ │ task + queries │  │
+        │  └────┬────┘ └────┬───────────┘  │
+        │       │           │              │
+        └───────┼───────────┼──────────────┘
+                │           │
+                ▼           ▼
+       ┌──────────────┐  ┌────────────────┐
+       │  rpc.ligate  │  │   Postgres     │
+       │  .io (chain) │  │  (Railway)     │
+       └──────────────┘  └────────────────┘
+```
+
+Two deploy artifacts (one Rust binary, one Postgres), one domain,
+sub-millisecond chain-to-Postgres latency on Railway's internal
+network.
+
+## CORS
+
+Permissive CORS on every public endpoint
+(`tower_http::cors::CorsLayer::permissive()` on the axum router).
+Browsers from arbitrary origins (Mneme wallet, Themisra demo pages,
+partner web apps) can POST without preflight blocking. v0 devnet is
+"anyone can call from any browser"; testnet+ tightens the origin
+allow-list.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Source + handler detail" icon="github" href="https://github.com/ligate-io/ligate-api">
+    Repository: axum router, Postgres migrations, chain → Postgres
+    ingest task.
+  </Card>
+
+  <Card title="Chain RPC (verification)" icon="server" href="/rpc">
+    `rpc.ligate.io`. The 115 chain endpoints behind everything here.
+  </Card>
+
+  <Card title="TypeScript SDK" icon="js" href="/js">
+    `@ligate-labs/sdk` wraps both `api.ligate.io` and the chain RPC.
+  </Card>
+
+  <Card title="Block explorer" icon="cube" href="https://explorer.ligate.io">
+    Live block + tx + attestation browser. Reads this API.
+  </Card>
+</CardGroup>
