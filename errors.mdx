@@ -54,9 +54,9 @@ ledger. The address has 0 `$LGT`.
    produces an address that doesn't match what `ligate keys generate`
    wrote)
 
-**Fix for case 1:** `ligate faucet <address>` (CLI v0.1.3+; older
-versions are broken, see [`ligate faucet`](/cli#ligate-faucet))
-then wait one block.
+**Fix for case 1:** `ligate faucet <address>` (older CLI versions
+are broken, see [`ligate faucet`](/cli#ligate-faucet)) then wait
+one block.
 
 **Fix for case 2:** Use the address printed by
 `ligate keys show <role>` (first 28 bytes of the ed25519 pubkey,
