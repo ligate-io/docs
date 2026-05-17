@@ -1,0 +1,217 @@
+---
+title: 'Architecture'
+sidebarTitle: 'Architecture'
+description: 'How Ligate fits together: chain + HTTP API + indexer + explorer + CLI + JS SDK + wallet + Iris. What lives where, who calls what, and the read vs write paths.'
+---
+
+How the pieces fit together. One sovereign rollup, two HTTP surfaces
+(point-lookup chain REST + indexer-backed API), the wallet and
+relayer that sit on top, and the read / write paths for both.
+
+## System map
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                  Users                                       │
+│   end users · operators · partners · agent runtimes (Claude, Cursor, ...)    │
+└───────┬──────────────────────────┬───────────────────────────┬───────────────┘
+        │                          │                           │
+        ▼                          ▼                           ▼
+┌───────────────┐         ┌─────────────────────┐    ┌─────────────────────┐
+│  Mneme        │         │  CLI / JS SDK       │    │  Iris MCP server    │
+│  (browser     │         │  (operator +        │    │  (agent attestation)│
+│   wallet)     │         │   builder)          │    │                     │
+│  v0.5         │         │  ligate / @ligate-  │    │  planned Q4'26      │
+│               │         │   labs/sdk          │    │                     │
+└──────┬────────┘         └──────────┬──────────┘    └──────────┬──────────┘
+       │                             │                          │
+       │                             │                          ▼
+       │                             │                 ┌──────────────────┐
+       │                             │                 │  Iris relayer    │
+       │                             │                 │  (USD-billed,    │
+       │                             │                 │   signer pool)   │
+       │                             │                 │  planned Q4'26   │
+       │                             │                 └──────────┬───────┘
+       │                             │                            │
+       ├─────────────────────────────┴────────────────────────────┤
+       │                                                          │
+       │      identity / balance / submit-tx (point lookups)      │
+       │                                                          │
+       ▼                                                          ▼
+┌────────────────────────┐                          ┌────────────────────────┐
+│    rpc.ligate.io       │                          │    api.ligate.io       │
+│                        │                          │                        │
+│    ligate-chain        │                          │    ligate-api          │
+│    (Rust, GCP)         │◀────indexer ingest──────│    (Rust, Railway)     │
+│                        │     (chain → Postgres)   │                        │
+│    115 endpoints       │                          │    27 endpoints        │
+│    under /v1/          │                          │    under /v1/          │
+│                        │                          │    (drip + indexer     │
+│    POST /v1/sequencer  │                          │     queries + stats)   │
+│    GET  /v1/ledger     │                          │                        │
+│    GET  /v1/modules    │                          │    Postgres            │
+│    GET  /v1/rollup     │                          └────────────────────────┘
+│                        │                                     ▲
+└────────────┬───────────┘                                     │
+             │                                                 │
+             │ DA blobs                                        │
+             ▼                                                 │
+┌────────────────────────┐                          ┌────────────────────────┐
+│    Celestia            │                          │    explorer.ligate.io  │
+│    (Mocha testnet,     │                          │    (Next.js, Vercel)   │
+│     mainnet beta       │                          │                        │
+│     post-mainnet)      │                          │    Reads api.ligate.io │
+└────────────────────────┘                          └────────────────────────┘
+```
+
+## What lives where
+
+| Component         | Repo                                                                         | Deploy           | Language    |
+| ----------------- | ---------------------------------------------------------------------------- | ---------------- | ----------- |
+| Chain node        | [`ligate-chain`](https://github.com/ligate-io/ligate-chain)                  | GCP (`e2-standard-4` sequencer + `e2-medium` followers) | Rust |
+| HTTP API + indexer| [`ligate-api`](https://github.com/ligate-io/ligate-api)                      | Railway          | Rust        |
+| Block explorer    | [`ligate-explorer`](https://github.com/ligate-io/ligate-explorer)            | Vercel           | Next.js     |
+| TypeScript SDK    | [`ligate-js`](https://github.com/ligate-io/ligate-js)                        | npm              | TypeScript  |
+| CLI               | [`ligate-cli`](https://github.com/ligate-io/ligate-cli)                      | GitHub Releases  | Rust        |
+| Faucet            | merged into `ligate-api` (`/v1/drip`)                                        | Railway          | Rust        |
+| Mneme wallet      | private, ships with Mneme v1                                                 | Chrome Web Store | TypeScript  |
+| Iris MCP / relayer| private, planned Q4'26                                                       | npm + SaaS       | TypeScript  |
+| These docs        | [`ligate-io/docs`](https://github.com/ligate-io/docs)                        | Mintlify         | MDX         |
+| Research          | [`ligate-research`](https://github.com/ligate-io/ligate-research)            | GitHub (papers + simulator) | LaTeX + Python |
+
+## The two HTTP surfaces
+
+The split is intentional and matters for choosing which one your
+client calls.
+
+### `rpc.ligate.io` — chain REST (verification truth)
+
+The chain node's own REST API. Point lookups by id. **115
+endpoints**, all under `/v1/`, auto-discovered from the runtime
+composition.
+
+- Identity + sync: `/v1/rollup/info`, `/v1/rollup/sync-status`
+- State reads: `/v1/modules/bank/...`, `/v1/modules/attestation/...`
+- Ledger reads: `/v1/ledger/slots/{id}`, `/v1/ledger/txs/{hash}`
+- Tx submission: `POST /v1/sequencer/txs`
+- WebSocket subs: `/v1/ledger/slots/latest/ws`, etc.
+
+**No list / range / aggregation queries.** Those would require
+secondary indexes that don't fit the chain's verification model.
+Full design rationale in
+[`attestation-v0.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/attestation-v0.md#whats-deliberately-not-here).
+
+Use when you need: chain identity, balances, point lookups by id,
+transaction submission, real-time event subscriptions. See
+[Chain RPC reference](/rpc).
+
+### `api.ligate.io` — HTTP API (operational queries)
+
+A separate Rust service backed by Postgres. The indexer task
+ingests chain state and exposes paginated / cursored / stats /
+search endpoints. **27 endpoints**, all under `/v1/`.
+
+- Faucet drip: `POST /v1/drip`
+- Indexer queries: `/v1/blocks`, `/v1/txs`, `/v1/addresses/{addr}`,
+  `/v1/schemas`, `/v1/attestor-sets`, `/v1/attestations`
+- Cross-cuts: `/v1/schemas/{id}/attestations`,
+  `/v1/attestor-sets/{id}/attestations`
+- Stats (cached): `/v1/stats/totals`, `/v1/stats/finality`,
+  `/v1/stats/active-addresses`, etc.
+
+Use when you need: listing, search, time-bounded queries,
+aggregated counts. See [HTTP API reference](/api).
+
+## Read vs write paths
+
+### Read path
+
+```
+Client  ──point lookup──▶  rpc.ligate.io  ──◆ verification truth
+        ──list / range──▶  api.ligate.io  ──▶ Postgres (indexer)
+        ──WebSocket sub─▶  rpc.ligate.io  ──▶ /v1/ledger/.../ws streams
+```
+
+Point lookups go straight to the chain. The chain answers from
+its own RocksDB-backed state.
+
+List / range queries go to the API. The API answers from Postgres,
+which the indexer task populates by ingesting the chain's events
++ state. Trade-off: slightly stale (indexer lag is sub-second
+under normal conditions), but supports queries the chain can't.
+
+### Write path
+
+```
+Client  ──build tx──▶  Borsh(Transaction::V0)  ──sign──▶  ed25519
+                                                              │
+                                                              ▼
+                                                  POST /v1/sequencer/txs
+                                                              │
+                                                              ▼
+                                                  rpc.ligate.io (sequencer)
+                                                              │
+                                              admit → mempool → batch
+                                                              │
+                                                              ▼
+                                                  blob → Celestia (DA)
+                                                              │
+                                                              ▼
+                                                  STF applies → state root
+                                                              │
+                                                              ▼
+                                                  Indexer ingests → Postgres
+```
+
+Every signature is over `borsh(UnsignedTransaction) ++ chain_hash`
+(where `chain_hash` is the build-time fingerprint of the runtime).
+This binds signatures to a specific runtime composition; a signature
+for `ligate-localnet` won't validate on `ligate-devnet-1`, etc.
+
+Transaction submission is fire-and-poll. The sequencer returns a
+queue-receipt tx hash; clients poll `/v1/ledger/txs/{hash}` for
+inclusion. The [JS SDK](/js)'s `waitForInclusion` and the
+[CLI](/cli)'s `submit-attestation` wrap the polling.
+
+## Where each client component fits
+
+| Component         | Reads from              | Writes to                          | Sees plaintext? |
+| ----------------- | ----------------------- | ---------------------------------- | --------------- |
+| CLI               | `rpc.ligate.io`, `api.ligate.io` | `rpc.ligate.io/v1/sequencer/txs` | Operator's machine |
+| JS SDK            | same                    | same                               | Same as the consuming app |
+| Mneme wallet      | `rpc.ligate.io` for identity + balance, `api.ligate.io` for activity | `rpc.ligate.io/v1/sequencer/txs` | Only on the user's machine; prompts/responses hashed locally before submission |
+| Iris MCP + relayer| same                    | `rpc.ligate.io/v1/sequencer/txs` (relayer signs) | Agent payloads stay with the agent; only digests cross the wire |
+| Explorer          | `api.ligate.io`         | (read-only)                        | None, just on-chain artifacts |
+
+## How v0 vs v1 vs v3 changes the picture
+
+| Phase       | Sequencer            | Validators              | DA            | Iris        | Mneme        |
+| ----------- | -------------------- | ----------------------- | ------------- | ----------- | ------------ |
+| v0 (now)    | Single (Ligate Labs) | Curated PoS             | Celestia Mocha | Planned     | v0.5         |
+| v1          | Same (leader rotation TBD) | Permissionless via stake + `disputes` module | Same | Released  | v1 extension |
+| v3 (mainnet)| Permissionless via PoUA | PoUA: stake × reputation | Celestia mainnet beta | Mature | Mature      |
+
+Mainnet (v3) flips consensus from PoS bootstrap to Proof of Useful
+Attestation. See [Validators](/validators) for the activation path
+and the [research repo](https://github.com/ligate-io/ligate-research)
+for the mechanism design.
+
+## Where to go from here
+
+<CardGroup cols={2}>
+  <Card title="Chain RPC" icon="server" href="/rpc">
+    The 115 endpoints behind `rpc.ligate.io`.
+  </Card>
+
+  <Card title="HTTP API" icon="cube" href="/api">
+    The 27 endpoints behind `api.ligate.io`.
+  </Card>
+
+  <Card title="Chain architecture" icon="diagram-project" href="/chain">
+    The modules + state layout + governance model.
+  </Card>
+
+  <Card title="Glossary" icon="book" href="/glossary">
+    Every term and identifier in one place.
+  </Card>
+</CardGroup>

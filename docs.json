@@ -45,7 +45,7 @@
           },
           {
             "group": "Protocol",
-            "pages": ["chain", "proof-of-prompt", "tokenomics"]
+            "pages": ["architecture", "chain", "proof-of-prompt", "tokenomics"]
           },
           {
             "group": "Developer surface",
