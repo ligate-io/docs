@@ -50,7 +50,7 @@ Each tagged release attaches a Linux x86_64 binary. From a fresh
 Ubuntu VM:
 
 ```bash
-LIGATE_VERSION=v0.2.0  # or whatever's latest
+LIGATE_VERSION=v0.2.3  # or whatever's latest
 curl -L -o ligate-node.tar.gz \
   https://github.com/ligate-io/ligate-chain/releases/download/$LIGATE_VERSION/ligate-node-$LIGATE_VERSION-linux-amd64.tar.gz
 tar -xzf ligate-node.tar.gz
@@ -134,7 +134,7 @@ curl http://127.0.0.1:12346/ready
 
 # Chain identity
 curl http://127.0.0.1:12346/v1/rollup/info
-# {"chain_id":"ligate-devnet-1","chain_hash":"<64 hex>","version":"0.2.0"}
+# {"chain_id":"ligate-devnet-1","chain_hash":"<64 hex>","version":"0.2.3"}
 ```
 
 ## Bootstrap from snapshot
