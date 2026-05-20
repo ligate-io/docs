@@ -63,6 +63,35 @@ sudo mv ligate-node-$LIGATE_VERSION-linux-amd64/ligate-node /usr/local/bin/
 ligate-node --version
 ```
 
+### Container image
+
+Each tagged release publishes a multi-arch (linux/amd64 +
+linux/arm64) image to GHCR. Fastest path on any host with Docker:
+
+```bash
+docker pull ghcr.io/ligate-io/ligate-chain:0.2.4   # or :latest
+
+# Run against the in-process MockDa (zero external services), config
+# + genesis mounted from a host checkout of the chain repo:
+docker run --rm -it \
+  -v /path/to/ligate-chain/devnet:/var/lib/ligate/devnet:ro \
+  -v ligate-state:/var/lib/ligate/state \
+  -p 12346:12346 \
+  ghcr.io/ligate-io/ligate-chain:0.2.4 \
+  --rollup-config-path /var/lib/ligate/devnet/rollup.toml \
+  --genesis-config-dir /var/lib/ligate/devnet/genesis
+```
+
+The image is debian-slim, runs as the unprivileged `ligate` user
+(uid 1000) by default, and exposes `12346` (REST) and `9100`
+(Prometheus `/metrics`).
+
+<Note>
+  Tag the version explicitly (`:0.2.4`) for reproducible deploys;
+  `:latest` follows the most recent release and is fine for casual
+  smoke testing but never use it on production VMs.
+</Note>
+
 ### From source
 
 When you want to track `main` or your platform has no pre-built
