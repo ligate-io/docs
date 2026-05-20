@@ -50,11 +50,16 @@ Each tagged release attaches a Linux x86_64 binary. From a fresh
 Ubuntu VM:
 
 ```bash
-LIGATE_VERSION=v0.2.3  # or whatever's latest
+# Release tags use the `v` prefix (e.g. v0.2.4); artifact filenames
+# omit it (e.g. ligate-node-0.2.4-linux-amd64.tar.gz). Tracked as two
+# variables so the curl URL stays correct without shell-substring
+# tricks.
+LIGATE_TAG=v0.2.4
+LIGATE_VERSION=0.2.4
 curl -L -o ligate-node.tar.gz \
-  https://github.com/ligate-io/ligate-chain/releases/download/$LIGATE_VERSION/ligate-node-$LIGATE_VERSION-linux-amd64.tar.gz
+  https://github.com/ligate-io/ligate-chain/releases/download/$LIGATE_TAG/ligate-node-$LIGATE_VERSION-linux-amd64.tar.gz
 tar -xzf ligate-node.tar.gz
-sudo mv ligate-node /usr/local/bin/
+sudo mv ligate-node-$LIGATE_VERSION-linux-amd64/ligate-node /usr/local/bin/
 ligate-node --version
 ```
 
