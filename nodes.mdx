@@ -194,18 +194,56 @@ quarantines existing state, and restores. Full procedure:
   (Kubernetes liveness + readiness).
 - **Logs**, JSON-structured, level-tunable via `RUST_LOG`.
 
+## Multi-sequencer (DbElected, self-hosted operators)
+
+A Ligate Labs operator can run a federated cluster of `ligate-node`
+instances against a shared Postgres-backed leader election. Exactly
+one node acts as `BatchProducer` at a time; the others stand by as
+`PgSyncReplica` and take over via in-process role transition if the
+leader fails. On `devnet-1` we run a three-node cluster and a forced-
+failover drill measured **~1.2 seconds** from kill to new leader
+producing batches, with no operator intervention.
+
+To activate `DbElected` on your own cluster:
+
+1. Provision a Postgres instance reachable from every sequencer VM
+   (we use Cloud SQL HA on devnet-1; any Postgres 14+ works).
+2. Add a `[sequencer.preferred.postgres_config]` block to each VM's
+   rollup config:
+   ```toml
+   [sequencer.preferred.postgres_config]
+   postgres_connection_string = "postgresql://USER:PASS@HOST:5432/DB?sslmode=require"
+   node_id = "ligate-devnet-1-sequencer-N"
+   node_role = "DbElected"
+   ```
+3. Set `bind_host = "0.0.0.0"` in `[runner.http_config]` so the
+   gateway VM's Caddy can fan out to the cluster over the VPC.
+4. Start `ligate-node` on each VM. The first to win the lock becomes
+   `BatchProducer`; the others register in the `nodes` table.
+
+Operator detail lives in the chain repo:
+
+- [`docs/development/runbooks/multi-sequencer-failover.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/runbooks/multi-sequencer-failover.md):
+  cluster state read, planned leader replacement, unplanned failure,
+  forced takeover, Postgres outage handling.
+- [`ops/caddy/Caddyfile`](https://github.com/ligate-io/ligate-chain/blob/main/ops/caddy/Caddyfile):
+  leader-aware write routing. `lb_policy first` with an active
+  `/v1/sequencer/role` health probe that accepts only response body
+  `BatchProducer`, so writes always reach the current leader; reads
+  round-robin across synced replicas.
+
 ## Known limitations (devnet)
 
-- **Single sequencer.** Followers don't propagate submitted txs; the
-  follower's `/v1/sequencer/txs` endpoint accepts but the blob is
-  filtered at the STF level (DA address not in registry). Point
-  clients at `https://rpc.ligate.io` for submissions.
 - **No automated DA bridging.** The Celestia signer key is operator-
   managed.
 - **Curated validator set.** Permissionless validator entry with
   economic stake lands at v1 alongside the
   [`disputes`](https://github.com/ligate-io/ligate-chain/issues/51)
   module.
+- **Follower-mode submissions.** Followers don't propagate submitted
+  txs; the follower's `/v1/sequencer/txs` endpoint accepts but the
+  blob is filtered at the STF level (DA address not in registry).
+  Point clients at `https://rpc.ligate.io` for submissions.
 
 ## Where to go from here
 
