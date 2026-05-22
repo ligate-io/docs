@@ -50,12 +50,12 @@ Each tagged release attaches a Linux x86_64 binary. From a fresh
 Ubuntu VM:
 
 ```bash
-# Release tags use the `v` prefix (e.g. v0.2.4); artifact filenames
-# omit it (e.g. ligate-node-0.2.4-linux-amd64.tar.gz). Tracked as two
+# Release tags use the `v` prefix (e.g. v0.2.11); artifact filenames
+# omit it (e.g. ligate-node-0.2.11-linux-amd64.tar.gz). Tracked as two
 # variables so the curl URL stays correct without shell-substring
 # tricks.
-LIGATE_TAG=v0.2.4
-LIGATE_VERSION=0.2.4
+LIGATE_TAG=v0.2.11
+LIGATE_VERSION=0.2.11
 curl -L -o ligate-node.tar.gz \
   https://github.com/ligate-io/ligate-chain/releases/download/$LIGATE_TAG/ligate-node-$LIGATE_VERSION-linux-amd64.tar.gz
 tar -xzf ligate-node.tar.gz
@@ -69,7 +69,7 @@ Each tagged release publishes a multi-arch (linux/amd64 +
 linux/arm64) image to GHCR. Fastest path on any host with Docker:
 
 ```bash
-docker pull ghcr.io/ligate-io/ligate-chain:0.2.4   # or :latest
+docker pull ghcr.io/ligate-io/ligate-chain:0.2.11   # or :latest
 
 # Run against the in-process MockDa (zero external services), config
 # + genesis mounted from a host checkout of the chain repo:
@@ -77,7 +77,7 @@ docker run --rm -it \
   -v /path/to/ligate-chain/devnet:/var/lib/ligate/devnet:ro \
   -v ligate-state:/var/lib/ligate/state \
   -p 12346:12346 \
-  ghcr.io/ligate-io/ligate-chain:0.2.4 \
+  ghcr.io/ligate-io/ligate-chain:0.2.11 \
   --rollup-config-path /var/lib/ligate/devnet/rollup.toml \
   --genesis-config-dir /var/lib/ligate/devnet/genesis
 ```
@@ -87,7 +87,7 @@ The image is debian-slim, runs as the unprivileged `ligate` user
 (Prometheus `/metrics`).
 
 <Note>
-  Tag the version explicitly (`:0.2.4`) for reproducible deploys;
+  Tag the version explicitly (`:0.2.11`) for reproducible deploys;
   `:latest` follows the most recent release and is fine for casual
   smoke testing but never use it on production VMs.
 </Note>
@@ -168,7 +168,7 @@ curl http://127.0.0.1:12346/ready
 
 # Chain identity
 curl http://127.0.0.1:12346/v1/rollup/info
-# {"chain_id":"ligate-devnet-1","chain_hash":"<64 hex>","version":"0.2.3"}
+# {"chain_id":"ligate-devnet-1","chain_hash":"lsch1...","version":"0.2.11"}
 ```
 
 ## Bootstrap from snapshot
