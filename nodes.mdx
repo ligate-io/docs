@@ -191,9 +191,7 @@ sudo /opt/ligate/scripts/import-snapshot.sh
 The script fetches `latest-daily.json` for the chain, downloads the
 RocksDB tarball + manifest, verifies SHA-256, stops `ligate-node`,
 quarantines existing state, and restores. Full procedure:
-[`follower-bootstrap.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/follower-bootstrap.md)
-(filename predates the v0.2.9 role-flag removal; the snapshot procedure
-itself is unchanged and applies to any node, sequencer or read-only).
+[`snapshot-bootstrap.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/snapshot-bootstrap.md).
 
 ## Monitor
 
@@ -378,7 +376,7 @@ Operator detail lives in the chain repo:
     monitoring. The canonical operator doc.
   </Card>
 
-  <Card title="Snapshot bootstrap" icon="download" href="https://github.com/ligate-io/ligate-chain/blob/main/docs/development/follower-bootstrap.md">
+  <Card title="Snapshot bootstrap" icon="download" href="https://github.com/ligate-io/ligate-chain/blob/main/docs/development/snapshot-bootstrap.md">
     Import a snapshot, skip the multi-hour replay.
   </Card>
 
