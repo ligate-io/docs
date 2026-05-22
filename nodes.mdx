@@ -194,6 +194,119 @@ quarantines existing state, and restores. Full procedure:
   (Kubernetes liveness + readiness).
 - **Logs**, JSON-structured, level-tunable via `RUST_LOG`.
 
+## What you get for running a node
+
+We get asked this a lot, so the answer up front: **running a sync
+node does not earn LGT.** That matches every major rollup operating
+today (Optimism, Arbitrum, zkSync, Polygon zkEVM, Base, Starknet
+all the same — sync nodes are unpaid). What you get instead:
+
+- **Local verifiability.** Every block, every attestation, every
+  schema is re-derived from the Celestia DA blobs by your node, not
+  taken on faith from `api.ligate.io`. If our hosted endpoints lie,
+  your node sees the discrepancy.
+- **Trust-minimised reads.** Your apps, dashboards, or compliance
+  tooling can hit `localhost:12346` instead of routing through our
+  gateway. Faster, private, no dependency on our uptime.
+- **Zero ongoing cost.** Celestia Mocha (the DA layer) is testnet,
+  so DA reads are free. The `SOV_CELESTIA_SIGNER_KEY` you configured
+  above is just a satisfy-the-config placeholder — your node never
+  pays a fee because it never holds the preferred-sequencer lock.
+- **Independence from the gateway.** If `rpc.ligate.io` is down for
+  maintenance or geographic-routing oddities, your local node
+  doesn't care. The chain keeps producing blocks; your node keeps
+  syncing.
+
+### Why no LGT for sync nodes
+
+A reward for "run a node that mirrors state" would just be a sybil
+printer: anyone can spin up dozens of nodes cheaply and earn for each
+one, with no economic work being done. The chains that DO pay node
+operators (Cosmos validators, Ethereum stakers, Solana validators)
+are paying for *consensus work* with skin in the game — signing
+blocks, slashing risk for misbehaviour, real bond requirements. Sync
+nodes do none of that.
+
+The protocol's incentive surface is reserved for actors who do real,
+verifiable work and post a bond.
+
+## How to earn LGT (today + roadmap)
+
+### Today: attestor sets
+
+This is the one earn-path live on `devnet-1` and open to anyone:
+
+1. Register an attestor set (`ligate register-attestor-set`). Costs a
+   one-time bond.
+2. Get a schema bound to your set — either register your own schema
+   that binds to it, or convince a third-party schema author to
+   include your set as a valid attestor surface.
+3. Whenever an attestation lands under that schema, the schema's
+   `fee_routing_bps` sends a configurable percentage of the
+   attestation fee to a configurable address. Set that address to a
+   wallet your attestor-set members control, and you earn LGT every
+   time the schema is used.
+
+End-to-end:
+
+```bash
+# 1. Generate an attestor keypair (or many)
+ligate keygen attestor > my-attestor.key
+
+# 2. Register a 1-of-1 attestor set with bond
+ligate register-attestor-set --members my-attestor.pub --threshold 1 --bond 1000000000
+
+# 3. Register a schema that routes 5% of attestation fees to your wallet
+ligate register-schema \
+  --schema-json my-schema.json \
+  --attestor-set las1... \
+  --fee-routing-bps 500 \
+  --fee-routing-addr lig1...
+
+# 4. Submit attestations, or wait for others to submit under your schema
+```
+
+`devnet-1` already has live attestor sets earning fees today.
+[`docs.ligate.io/cli/register-attestor-set`](/cli/register-attestor-set)
+walks the flow in detail.
+
+### Roadmap: how node providers will earn
+
+Three mechanisms are in the protocol design and incrementally
+shipping. None of them are "run a sync node, get tokens" — all
+require posting a bond and doing verifiable work.
+
+1. **Decentralised sequencer set (v1+).** Today devnet-1 runs a
+   single registered sequencer (Ligate Labs). The chain code already
+   supports a Postgres-coordinated multi-sequencer cluster (see the
+   "Multi-sequencer (DbElected)" section below), but the registered
+   address set is gated at genesis. In v1 the `sequencer_registry`
+   becomes openable: prospective sequencers post a bond
+   (`sequencer_bond` in `genesis/sequencer_registry.json`), get
+   slashed for double-signing or signing invalid batches, earn from
+   the per-batch protocol fee that today goes entirely to the
+   Ligate Labs sequencer. Tracking: `ligate-chain` issue #82.
+2. **Prover rewards (v1+).** `prover_incentives.json` already exists
+   in genesis with a defined fee curve; today the only prover is
+   Ligate Labs. v1+ opens prover registration to anyone willing to
+   bond and submit valid Risc0 / SP1 proofs of the rollup state
+   transition. Provers earn a per-proof fee from the protocol
+   treasury. Tracking: `ligate-chain` issue #410 (alongside the
+   native DA migration).
+3. **Operator incentives for SLA-bound RPC providers (later).** An
+   open question for the protocol design: do we want to reward
+   external operators who run public RPC mirrors with measurable
+   uptime SLAs (Pocket Network style)? Pros: ecosystem diversity.
+   Cons: SLA verification is hard, and centralised RPCs (Alchemy
+   etc) have shown the market doesn't always reward this. Filed as
+   a discussion in `ligate-chain` issue #234 ("public Grafana +
+   public RPC providers"). Likely a v1.x feature, not v1.0.
+
+The honest framing for design partners + node operators: the
+protocol pays you to do **work** (attest, sequence, prove). It does
+not pay you to **exist** (mirror state). Aligns with how every
+major rollup has converged.
+
 ## Multi-sequencer (DbElected, self-hosted operators)
 
 A Ligate Labs operator can run a federated cluster of `ligate-node`
