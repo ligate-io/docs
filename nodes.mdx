@@ -1,21 +1,26 @@
 ---
 title: 'Run a node'
 sidebarTitle: 'Nodes'
-description: 'Run a Ligate node against ligate-devnet-1. Hardware requirements, install paths, configuration, bring-up, monitoring. Sequencer vs follower roles.'
+description: 'Run a Ligate node against ligate-devnet-1. Hardware requirements, install paths, configuration, bring-up, monitoring. Sequencer and read-only sync node deploys.'
 ---
 
-`ligate-node` is the single binary that runs the chain. Two roles share
-the same binary and chain state, differing only in DA layer and whether
-they accept transaction submissions.
+`ligate-node` is the single binary that runs the chain. Every node syncs
+the full state from Celestia DA; whether it produces batches is decided
+at runtime by the Postgres lock state (when DbElected mode is active) or
+by being the registered preferred sequencer (today's single-sequencer
+default). There is no separate "follower" flag. It was removed in
+chain v0.2.9 (chain#446); the runtime role check handles the same
+"don't propagate submissions" guarantee.
 
-| Role         | Accepts tx submissions? | DA layer                   | Hardware  |
-| ------------ | ----------------------- | -------------------------- | --------- |
-| **Sequencer**| Yes                     | Celestia Mocha (devnet)    | `e2-standard-4` |
-| **Follower** | No (503s, points caller at sequencer) | Same DA, reads | `e2-medium` |
+| Deploy type             | Posts batches?                | DA layer                | Typical hardware |
+| ----------------------- | ----------------------------- | ----------------------- | ---------------- |
+| **Registered sequencer** | Yes (the preferred sequencer) | Celestia Mocha (devnet) | `e2-standard-2` |
+| **Read-only sync node** | No (SDK returns 503 on `POST /v1/sequencer/txs` from non-leaders) | Same DA, reads | `e2-medium` |
 
 The public devnet runs a single curated sequencer (Ligate Labs).
-Anyone can run a follower. Leader rotation and a permissionless
-validator set both ship at v1.
+Anyone can run a read-only sync node, no permission needed. A
+permissionless sequencer set ships at v1+ (see
+[ligate-chain#82](https://github.com/ligate-io/ligate-chain/issues/82)).
 
 ## Hardware
 
@@ -23,14 +28,17 @@ Reference shape from the
 [`public-devnet-deploy.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/public-devnet-deploy.md)
 runbook:
 
-| Role      | GCP shape       | vCPU | RAM   | Boot disk | Data disk   | $/mo (sustained) |
-| --------- | --------------- | ---- | ----- | --------- | ----------- | ---------------- |
-| Sequencer | `e2-standard-4` | 4    | 16 GB | 20 GB SSD | 150 GB SSD  | ~135 USD         |
-| Follower  | `e2-medium`     | 2    | 4 GB  | 20 GB SSD | 100 GB SSD  | ~30 USD          |
+| Deploy type        | GCP shape       | vCPU | RAM  | Boot disk | Data disk  | $/mo (sustained) |
+| ------------------ | --------------- | ---- | ---- | --------- | ---------- | ---------------- |
+| Registered sequencer | `e2-standard-2` | 2  | 8 GB | 20 GB SSD | 100 GB SSD | ~80 USD          |
+| Read-only sync node  | `e2-medium`     | 2  | 4 GB | 20 GB SSD | 100 GB SSD | ~30 USD          |
 
 Sequencer headroom covers `ligate-node` + co-located Celestia light
-node + local backup snapshot stage. Follower drops the snapshot stage
-(it can restore from GCS or replay from DA if state is lost).
+node. Read-only nodes can restore from a snapshot or replay from DA if
+state is lost. Ligate Labs runs the public devnet on a single
+`e2-standard-2` today (single-sequencer mode, no multi-VM cluster);
+the sizing above reflects what a third-party operator would
+provision.
 
 <Note>
   OS: **Ubuntu 24.04 LTS**. The released `ligate-node` binary links
@@ -183,7 +191,9 @@ sudo /opt/ligate/scripts/import-snapshot.sh
 The script fetches `latest-daily.json` for the chain, downloads the
 RocksDB tarball + manifest, verifies SHA-256, stops `ligate-node`,
 quarantines existing state, and restores. Full procedure:
-[`follower-bootstrap.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/follower-bootstrap.md).
+[`follower-bootstrap.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/follower-bootstrap.md)
+(filename predates the v0.2.9 role-flag removal; the snapshot procedure
+itself is unchanged and applies to any node, sequencer or read-only).
 
 ## Monitor
 
@@ -353,9 +363,11 @@ Operator detail lives in the chain repo:
   economic stake lands at v1 alongside the
   [`disputes`](https://github.com/ligate-io/ligate-chain/issues/51)
   module.
-- **Follower-mode submissions.** Followers don't propagate submitted
-  txs; the follower's `/v1/sequencer/txs` endpoint accepts but the
-  blob is filtered at the STF level (DA address not in registry).
+- **Read-only-node submissions.** Only the registered preferred
+  sequencer (or, under `DbElected`, the current lock-holder) posts
+  batches. A sync node's `POST /v1/sequencer/txs` returns 503
+  (`PgSyncReplica` role); even if a stale client posted, the blob
+  would be filtered at the STF (DA address not in the registry).
   Point clients at `https://rpc.ligate.io` for submissions.
 
 ## Where to go from here
@@ -366,7 +378,7 @@ Operator detail lives in the chain repo:
     monitoring. The canonical operator doc.
   </Card>
 
-  <Card title="Follower bootstrap" icon="download" href="https://github.com/ligate-io/ligate-chain/blob/main/docs/development/follower-bootstrap.md">
+  <Card title="Snapshot bootstrap" icon="download" href="https://github.com/ligate-io/ligate-chain/blob/main/docs/development/follower-bootstrap.md">
     Import a snapshot, skip the multi-hour replay.
   </Card>
 
