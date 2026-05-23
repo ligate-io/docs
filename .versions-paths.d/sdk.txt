@@ -1,0 +1,8 @@
+# Files where the `sdk` (ligate-io/ligate-js, npm `@ligate-labs/sdk`)
+# pinned version is sed-replaced when it bumps.
+#
+# Empty today: `js.mdx` uses semver-compatible install
+# (`pnpm add @ligate-labs/sdk@^0.2.0`), so the literal doesn't drift
+# on minor/patch bumps. Re-add the file here if/when we pin to an
+# exact version, or when a major release ships and we need to bump
+# the caret range manually.

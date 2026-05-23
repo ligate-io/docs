@@ -1,7 +1,0 @@
-# Paths the `bump-versions` workflow rewrites when a tracked upstream
-# bumps. One path per line; blank lines + `#` comments ignored. Glob
-# patterns supported via `find`. Keep this list tight: every line is a
-# file the workflow will `sed -i` against.
-#
-# `chain` (ligate-io/ligate-chain) → bumps in:
-nodes.mdx
