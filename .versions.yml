@@ -2,8 +2,15 @@
 # Source of truth for the `bump-versions` workflow at
 # `.github/workflows/bump-versions.yml`. The workflow compares this
 # against the latest published release of each upstream repo; on
-# mismatch it sed-replaces the literal version (and v-prefix variant)
-# across files listed in `.versions-paths.txt`, updates this manifest,
-# and opens an auto-PR for review.
-chain: "0.2.13"
-# Phase 3 will add: cli, sdk, api
+# mismatch it sed-replaces the literal version across the per-source
+# files listed in `.versions-paths.d/<source>.txt`, updates this
+# manifest, and opens an auto-PR.
+#
+# Each key maps to a `ligate-io/<repo>` GitHub repo. To add a new
+# tracked source: append a key here, create the matching
+# `.versions-paths.d/<key>.txt`, and add `<key>-released` to the
+# workflow's `repository_dispatch.types`.
+chain: '0.2.13'
+cli: '0.2.1'
+sdk: '0.2.0'
+api: '0.2.1'

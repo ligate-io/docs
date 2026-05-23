@@ -1,0 +1,7 @@
+# Files where the `api` (ligate-io/ligate-api) pinned version is
+# sed-replaced when it bumps. ligate-api is Railway-deployed (no
+# tagged release workflow today); tracked here for visibility but
+# `gh release view` will return "no release" until that ships.
+#
+# The api version appears in example /v1/info output literals.
+api.mdx

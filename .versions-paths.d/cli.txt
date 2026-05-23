@@ -1,0 +1,6 @@
+# Files where the `cli` (ligate-io/ligate-cli) pinned version is
+# sed-replaced when it bumps. The cli's user-facing install command
+# (`releases/latest/download/...`) doesn't need bumping; only the
+# prose claim ("Current release: v0.2.1") + the example output
+# version literals.
+cli.mdx

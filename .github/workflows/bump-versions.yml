@@ -1,29 +1,32 @@
 name: bump-versions
 
 # Auto-PR when a tracked upstream artifact ships a new release. Reads
-# the current pinned version from `.versions.yml`, fetches the latest
+# the current pinned versions from `.versions.yml`, fetches the latest
 # release tag for each tracked source via the GitHub API, and on any
-# mismatch sed-replaces the literal version across the paths listed in
-# `.versions-paths.txt`.
+# mismatch sed-replaces the literal version across the per-source
+# file lists in `.versions-paths.d/<source>.txt`.
 #
 # Three triggers:
-#   1. Daily cron — safety net so we never drift more than 24h.
-#   2. `workflow_dispatch` — manual on-demand run from the Actions tab.
-#   3. `repository_dispatch` from the sender (chain repo's release.yml
-#      dispatches a `chain-released` event after publishing a tag).
+#   1. Daily cron (07:00 UTC) — 24-hour safety net.
+#   2. `workflow_dispatch` — manual on-demand from the Actions tab.
+#   3. `repository_dispatch` — push events from upstream release.yml
+#      workflows (`chain-released`, `cli-released`, etc.).
 #
-# Phase 2 (chain#468 follow-up) tracks chain only. Phase 3 extends to
-# cli / sdk / api by appending entries to `.versions.yml` and
-# `.versions-paths.txt`.
+# Sources tracked today: chain, cli, sdk, api. To add a new one,
+# append a key to `.versions.yml`, create the matching
+# `.versions-paths.d/<key>.txt`, and add `<key>-released` to the
+# `repository_dispatch.types` array below.
 
 on:
   schedule:
-    # 07:00 UTC daily. Chain releases ship infrequently; a 24-hour
-    # safety net is plenty if the repository_dispatch path is broken.
     - cron: '0 7 * * *'
   workflow_dispatch:
   repository_dispatch:
-    types: [chain-released, cli-released, sdk-released, api-released]
+    types:
+      - chain-released
+      - cli-released
+      - sdk-released
+      - api-released
 
 permissions:
   contents: write
@@ -40,60 +43,78 @@ jobs:
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
-      - name: Read current pinned versions
-        id: cur
-        run: |
-          echo "chain=$(yq '.chain' .versions.yml)" >> $GITHUB_OUTPUT
-
-      - name: Fetch latest upstream releases
-        id: latest
+      - name: Iterate tracked sources + sed-bump any that drifted
+        id: bump
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          CHAIN_TAG=$(gh release view -R ligate-io/ligate-chain --json tagName --jq '.tagName')
-          # Strip leading 'v' so the manifest format stays bare-semver.
-          echo "chain=${CHAIN_TAG#v}" >> $GITHUB_OUTPUT
-
-      - name: Bump version pins if any changed
-        id: bump
-        env:
-          OLD_CHAIN: ${{ steps.cur.outputs.chain }}
-          NEW_CHAIN: ${{ steps.latest.outputs.chain }}
-        run: |
-          changed=0
-          if [[ "$OLD_CHAIN" != "$NEW_CHAIN" ]]; then
-            echo "::notice::chain $OLD_CHAIN → $NEW_CHAIN"
-            yq -i ".chain = \"$NEW_CHAIN\"" .versions.yml
-            # Build the path list from `.versions-paths.txt` (skip
-            # comments + blanks) and sed-replace both the bare-semver
-            # and v-prefixed forms. Idempotent: re-running with the
-            # same OLD/NEW is a no-op.
-            paths=$(grep -vE '^\s*(#|$)' .versions-paths.txt | tr '\n' ' ')
-            if [[ -n "$paths" ]]; then
-              # shellcheck disable=SC2086
-              sed -i "s|v${OLD_CHAIN}|v${NEW_CHAIN}|g; s|${OLD_CHAIN}|${NEW_CHAIN}|g" $paths
+          set -euo pipefail
+          changed_sources=()
+          summary=""
+          # Map of local-key → GitHub repo. Keep ordered with .versions.yml.
+          declare -A repos=(
+            [chain]="ligate-io/ligate-chain"
+            [cli]="ligate-io/ligate-cli"
+            [sdk]="ligate-io/ligate-js"
+            [api]="ligate-io/ligate-api"
+          )
+          for src in chain cli sdk api; do
+            repo="${repos[$src]}"
+            paths_file=".versions-paths.d/${src}.txt"
+            old=$(yq ".$src" .versions.yml)
+            # `gh release view` returns non-zero on repos with zero
+            # tagged releases (api today). Soft-fail so the workflow
+            # continues for the other sources.
+            new_tag=$(gh release view -R "$repo" --json tagName --jq '.tagName' 2>/dev/null || echo "")
+            new="${new_tag#v}"
+            if [[ -z "$new" ]]; then
+              echo "::notice::$src ($repo) has no releases yet; skipping"
+              continue
             fi
-            changed=1
+            if [[ "$old" == "$new" ]]; then
+              echo "$src: already at $new"
+              continue
+            fi
+            echo "::notice::$src $old → $new"
+            yq -i ".${src} = \"${new}\"" .versions.yml
+            if [[ -f "$paths_file" ]]; then
+              paths=$(grep -vE '^\s*(#|$)' "$paths_file" | tr '\n' ' ')
+              if [[ -n "$paths" ]]; then
+                # shellcheck disable=SC2086
+                sed -i "s|v${old}|v${new}|g; s|${old}|${new}|g" $paths
+              fi
+            fi
+            changed_sources+=("$src")
+            summary="${summary}- **${src}**: \`${old}\` → \`${new}\` ([release notes](https://github.com/${repo}/releases/tag/v${new}))\n"
+          done
+          if [[ ${#changed_sources[@]} -gt 0 ]]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "sources_csv=$(IFS=,; echo "${changed_sources[*]}")" >> $GITHUB_OUTPUT
+            # Multiline output via heredoc-style.
+            {
+              echo "summary<<EOF"
+              echo -e "$summary"
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
           fi
-          echo "changed=$changed" >> $GITHUB_OUTPUT
 
       - name: Open auto-PR
-        if: steps.bump.outputs.changed == '1'
+        if: steps.bump.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: bump chain pin to v${{ steps.latest.outputs.chain }}"
-          branch: chore/bump-chain-v${{ steps.latest.outputs.chain }}
+          commit-message: 'chore: auto-bump tracked pins (${{ steps.bump.outputs.sources_csv }})'
+          branch: chore/bump-pins
           delete-branch: true
-          title: "chore: bump chain pin to v${{ steps.latest.outputs.chain }}"
+          title: 'chore: auto-bump tracked pins (${{ steps.bump.outputs.sources_csv }})'
           body: |
             **Automated by `bump-versions.yml`.**
 
-            Chain version pin bumped: `${{ steps.cur.outputs.chain }}` → `${{ steps.latest.outputs.chain }}`.
+            ${{ steps.bump.outputs.summary }}
 
-            Files touched are the ones listed in `.versions-paths.txt`. The literal version string was replaced exactly, both in bare-semver (`${{ steps.cur.outputs.chain }}`) and v-prefixed (`v${{ steps.cur.outputs.chain }}`) forms.
-
-            [Chain release notes →](https://github.com/ligate-io/ligate-chain/releases/tag/v${{ steps.latest.outputs.chain }})
+            Files touched come from the per-source `.versions-paths.d/<source>.txt` lists. The literal version was replaced exactly, both bare-semver and v-prefixed.
 
             ---
 

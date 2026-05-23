@@ -1,0 +1,3 @@
+# Files where the `chain` (ligate-io/ligate-chain) pinned version
+# is sed-replaced when it bumps.
+nodes.mdx
