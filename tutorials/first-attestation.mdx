@@ -40,7 +40,7 @@ call.
 export LIGATE_RPC=https://rpc.ligate.io
 export LIGATE_CHAIN_ID=4242
 export LIGATE_CHAIN_HASH=$(ligate info --json | jq -r .chain_hash)
-export LIGATE_LGT_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
+export LIGATE_AVOW_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
 
 # Verify
 ligate info
@@ -68,12 +68,12 @@ echo $ALICE_PK
 
 ## Step 3: Claim from the faucet
 
-You need `$LGT` to pay registration fees (10 LGT for the attestor
-set + 100 LGT for the schema + the per-attestation 0.001 LGT).
+You need `AVOW` to pay registration fees (10 AVOW for the attestor
+set + 100 AVOW for the schema + the per-attestation 0.001 AVOW).
 
 ```bash
 ligate faucet $ALICE
-# ✓ drip: 100 $LGT (100000000000 nano)
+# ✓ drip: 100 AVOW (100000000000 nano)
 #   tx:      ltx1zd2qmly…ljgth4
 
 # Verify
@@ -82,11 +82,11 @@ ligate balance $ALICE --json
 #   "address": "lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b",
 #   "token_id": "token_1nyl...",
 #   "amount_nano": 100000000000,
-#   "amount_lgt": 100.0
+#   "amount_avow": 100.0
 # }
 ```
 
-100 LGT covers our registration + a few attestations comfortably.
+100 AVOW covers our registration + a few attestations comfortably.
 
 ## Step 4: Register a 1-of-1 attestor set
 

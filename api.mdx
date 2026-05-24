@@ -87,7 +87,7 @@ investor / operator dashboards.
 | `GET /v1/stats/new-wallets-daily`   | Daily new wallets time series                                        |
 | `GET /v1/stats/tx-rate-daily`       | Daily tx rate time series                                            |
 | `GET /v1/stats/attestations-daily`  | Daily attestation rate time series                                   |
-| `GET /v1/stats/top-holders`         | Top `$LGT` holders                                                   |
+| `GET /v1/stats/top-holders`         | Top `AVOW` holders                                                   |
 
 ## Faucet drip example
 
@@ -101,7 +101,7 @@ curl -X POST https://api.ligate.io/v1/drip \
 # Check drip configuration
 curl https://api.ligate.io/v1/drip/status
 # → {
-#     "drip_amount": "100000000000",         // nano $LGT (= 100 $LGT)
+#     "drip_amount": "100000000000",         // nano AVOW (= 100 AVOW)
 #     "rate_limit_secs": 86400,              // 24 h cooldown per address
 #     "addresses_dripped": 1247,
 #     "faucet_address": "lig1zd9j2z6x55ydnv9m8f0pdw3vs2j8u0w5sdqeaf478dzp6s998ac"

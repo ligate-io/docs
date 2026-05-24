@@ -12,7 +12,7 @@ TypeScript / JavaScript.
 <Tip>
   This is the **server-side proxy** pattern from
   [Themisra integration](/themisra/api#3-server-side-proxy). The
-  service holds one signing key; users never manage `$LGT` or
+  service holds one signing key; users never manage `AVOW` or
   wallets.
 </Tip>
 
@@ -23,7 +23,7 @@ node --version    # 20+
 pnpm --version    # any recent
 ```
 
-A `$LGT`-funded service key (we'll generate one from a known hex).
+A `AVOW`-funded service key (we'll generate one from a known hex).
 The chain identity values (chain_id, chain_hash, token_id) live in
 constants the SDK ships with, but you'll fetch chain_hash live from
 the node to handle hard-fork bumps gracefully.
@@ -268,7 +268,7 @@ app.get('/verify/:attestationId', async (req, res) => {
 - **`chain_hash` cache.** Cache `info.chain_hash` per process; it
   only changes on a chain reset (rare, days of notice in the
   changelog).
-- **Cost.** Each `SubmitAttestation` costs 0.001 `$LGT` default
+- **Cost.** Each `SubmitAttestation` costs 0.001 `AVOW` default
   per the [tokenomics](/tokenomics). At devnet faucet prices that's
   100,000 attestations per drip.
 

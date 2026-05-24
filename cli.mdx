@@ -1,7 +1,7 @@
 ---
 title: 'CLI'
 sidebarTitle: 'CLI'
-description: 'The ligate command-line tool. Generate keys, claim from the faucet, transfer $LGT, register schemas and submit attestations against ligate-devnet-1. Written in Rust, no JS runtime required.'
+description: 'The ligate command-line tool. Generate keys, claim from the faucet, transfer AVOW, register schemas and submit attestations against ligate-devnet-1. Written in Rust, no JS runtime required.'
 ---
 
 Operator and builder surface for Ligate Chain. The single `ligate`
@@ -68,7 +68,7 @@ Per-subcommand chain identity (only on commands that submit txs):
 | ---------------- | ------------------------- | -------------------------------------------------------- |
 | `--chain-id`     | `LIGATE_CHAIN_ID`         | `u64`. Devnet: `4242`                                    |
 | `--chain-hash`   | `LIGATE_CHAIN_HASH`       | Accepts bech32m `lsch1...`, `0x`-prefixed hex, or bare 64-char hex |
-| `--token-id`     | `LIGATE_LGT_TOKEN_ID`     | Accepts bech32m `token_1...`, `0x`-prefixed hex, or bare 64-char hex |
+| `--token-id`     | `LIGATE_AVOW_TOKEN_ID`     | Accepts bech32m `token_1...`, `0x`-prefixed hex, or bare 64-char hex |
 | `--faucet-url`   | `LIGATE_FAUCET_URL`       | Default `https://api.ligate.io/v1/drip`. Full POST URL (no path suffix appended; pass the whole endpoint) |
 
 ```bash
@@ -76,7 +76,7 @@ Per-subcommand chain identity (only on commands that submit txs):
 export LIGATE_RPC=https://rpc.ligate.io
 export LIGATE_CHAIN_ID=4242
 export LIGATE_CHAIN_HASH=$(ligate info --json | jq -r .chain_hash)
-export LIGATE_LGT_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
+export LIGATE_AVOW_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
 ```
 
 ## `ligate info`
@@ -123,18 +123,18 @@ ligate keys show alice --pubkey
 
 ## `ligate balance`
 
-Read the `$LGT` (or any token) balance of an address.
+Read the `AVOW` (or any token) balance of an address.
 
 ```bash
 ligate balance lig1qxk7r4z9c8m3v2pa6h0w5y8t4d2n3l1f7g6e9b \
   --token-id token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
 
-ligate balance lig1... --token-id $LIGATE_LGT_TOKEN_ID --json
+ligate balance lig1... --token-id $LIGATE_AVOW_TOKEN_ID --json
 # {
 #   "address": "lig1...",
 #   "token_id": "token_1nyl...",
 #   "amount_nano": 100000000000,
-#   "amount_lgt": 100.0
+#   "amount_avow": 100.0
 # }
 ```
 
@@ -146,14 +146,14 @@ address.
 | Flag             | Required | Notes                                                  |
 | ---------------- | -------- | ------------------------------------------------------ |
 | `--to`           | yes      | Recipient `lig1...` address                            |
-| `--amount`       | one of   | Float `$LGT` (e.g. `0.5`). Conflicts with `--amount-nano` |
-| `--amount-nano`  | one of   | Integer nano-LGT. Conflicts with `--amount`            |
+| `--amount`       | one of   | Float `AVOW` (e.g. `0.5`). Conflicts with `--amount-nano` |
+| `--amount-nano`  | one of   | Integer nano-AVOW. Conflicts with `--amount`            |
 | `--signer`       | one of   | Keystore role label (`--signer alice`)                 |
 | `--private-key-hex` | one of | 32-byte hex (with or without `0x`). Conflicts with `--signer` |
 | `--keystore`     | optional | Override keystore dir                                  |
 | `--chain-id`     | yes      | `u64`, env `LIGATE_CHAIN_ID`                           |
 | `--chain-hash`   | yes      | Hex or bech32m, env `LIGATE_CHAIN_HASH`                |
-| `--token-id`     | yes      | Hex or bech32m, env `LIGATE_LGT_TOKEN_ID`              |
+| `--token-id`     | yes      | Hex or bech32m, env `LIGATE_AVOW_TOKEN_ID`              |
 
 ```bash
 ligate transfer \
@@ -170,7 +170,7 @@ address argument, no signing involved.
 
 ```bash
 ligate faucet lig1qxk7r4z9...
-# ✓ drip: 100 $LGT (100000000000 nano)
+# ✓ drip: 100 AVOW (100000000000 nano)
 #   tx:      ltx1zd2qmly…ljgth4
 
 ligate faucet $(ligate keys show alice)

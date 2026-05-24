@@ -205,9 +205,9 @@ quarantines existing state, and restores. Full procedure:
 ## What you get for running a node
 
 We get asked this a lot, so the answer up front: **running a sync
-node does not earn LGT.** That matches every major rollup operating
+node does not earn AVOW.** That matches every major rollup operating
 today (Optimism, Arbitrum, zkSync, Polygon zkEVM, Base, Starknet
-all the same — sync nodes are unpaid). What you get instead:
+all the same, sync nodes are unpaid). What you get instead:
 
 - **Local verifiability.** Every block, every attestation, every
   schema is re-derived from the Celestia DA blobs by your node, not
@@ -218,27 +218,27 @@ all the same — sync nodes are unpaid). What you get instead:
   gateway. Faster, private, no dependency on our uptime.
 - **Zero ongoing cost.** Celestia Mocha (the DA layer) is testnet,
   so DA reads are free. The `SOV_CELESTIA_SIGNER_KEY` you configured
-  above is just a satisfy-the-config placeholder — your node never
+  above is just a satisfy-the-config placeholder, your node never
   pays a fee because it never holds the preferred-sequencer lock.
 - **Independence from the gateway.** If `rpc.ligate.io` is down for
   maintenance or geographic-routing oddities, your local node
   doesn't care. The chain keeps producing blocks; your node keeps
   syncing.
 
-### Why no LGT for sync nodes
+### Why no AVOW for sync nodes
 
 A reward for "run a node that mirrors state" would just be a sybil
 printer: anyone can spin up dozens of nodes cheaply and earn for each
 one, with no economic work being done. The chains that DO pay node
 operators (Cosmos validators, Ethereum stakers, Solana validators)
-are paying for *consensus work* with skin in the game — signing
+are paying for *consensus work* with skin in the game, signing
 blocks, slashing risk for misbehaviour, real bond requirements. Sync
 nodes do none of that.
 
 The protocol's incentive surface is reserved for actors who do real,
 verifiable work and post a bond.
 
-## How to earn LGT (today + roadmap)
+## How to earn AVOW (today + roadmap)
 
 ### Today: attestor sets
 
@@ -246,13 +246,13 @@ This is the one earn-path live on `devnet-1` and open to anyone:
 
 1. Register an attestor set (`ligate register-attestor-set`). Costs a
    one-time bond.
-2. Get a schema bound to your set — either register your own schema
+2. Get a schema bound to your set, either register your own schema
    that binds to it, or convince a third-party schema author to
    include your set as a valid attestor surface.
 3. Whenever an attestation lands under that schema, the schema's
    `fee_routing_bps` sends a configurable percentage of the
    attestation fee to a configurable address. Set that address to a
-   wallet your attestor-set members control, and you earn LGT every
+   wallet your attestor-set members control, and you earn AVOW every
    time the schema is used.
 
 End-to-end:
@@ -281,7 +281,7 @@ walks the flow in detail.
 ### Roadmap: how node providers will earn
 
 Three mechanisms are in the protocol design and incrementally
-shipping. None of them are "run a sync node, get tokens" — all
+shipping. None of them are "run a sync node, get tokens", all
 require posting a bond and doing verifiable work.
 
 1. **Decentralised sequencer set (v1+).** Today devnet-1 runs a

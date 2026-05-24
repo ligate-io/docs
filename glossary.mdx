@@ -73,16 +73,16 @@ another, which the chain explicitly prevents.
 
 ## Token + economics
 
-- **`$LGT`**, the chain's gas + fee + governance token. **9
-  decimals** on the wire. 1 nano `$LGT` = `0.000000001 $LGT`.
+- **`AVOW`**, the chain's gas + fee + governance token. **9
+  decimals** on the wire. 1 nano `AVOW` = `0.000000001 AVOW`.
 - **nano**, the smallest unit (one of the 9 decimal places). All
   API amounts are in `u64` nanos.
-- **Total supply**, 1,000,000,000 `$LGT` at genesis. No
+- **Total supply**, 1,000,000,000 `AVOW` at genesis. No
   inflationary issuance.
 - **Default fees**:
-  - `RegisterAttestorSet`, 10 `$LGT`
-  - `RegisterSchema`, 100 `$LGT`
-  - `SubmitAttestation`, 0.001 `$LGT` per attestation
+  - `RegisterAttestorSet`, 10 `AVOW`
+  - `RegisterSchema`, 100 `AVOW`
+  - `SubmitAttestation`, 0.001 `AVOW` per attestation
 - **`max_builder_bps`**, protocol cap on the schema-owner's share of
   per-attestation fees. Default 5000 basis points (50%).
 - **Base fee burn**, 10% of base fee burned, rest goes to
@@ -164,7 +164,7 @@ another, which the chain explicitly prevents.
 - **Themisra**, first canonical schema (`themisra.proof-of-prompt v1.0.0`).
   AI provenance receipts for humans using AI.
 - **Mneme**, first-party browser wallet (v0.5, in development).
-  Holds `$LGT`, signs every chain transaction, one-click attestation
+  Holds `AVOW`, signs every chain transaction, one-click attestation
   from AI tabs.
 - **Iris**, MCP server + USD-billed relayer for autonomous agents
   (planned Q4 2026 / Q1 2027).

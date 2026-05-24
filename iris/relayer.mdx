@@ -7,14 +7,14 @@ description: 'Iris relayer: USD-billed signing and submission service. Agents ca
 The Iris relayer is the hosted half of [Iris](/iris). The
 [MCP server](/iris/mcp) calls into it; it signs and submits
 attestations to `rpc.ligate.io` on the agent's behalf, and bills the
-parent org in USD. Agents never hold wallets or `$LGT`.
+parent org in USD. Agents never hold wallets or `AVOW`.
 
 <Warning>
   **Planned.** Slated for Q4 2026 / Q1 2027. Architecture, pricing,
   and the sponsored-gas model are public; the hosted service is in
   development. Until it ships, agents can submit attestations
   directly via the [JavaScript SDK](/js) or the
-  [HTTP API](/api), with the parent org holding `$LGT` and managing
+  [HTTP API](/api), with the parent org holding `AVOW` and managing
   the signing key directly.
 </Warning>
 
@@ -23,7 +23,7 @@ parent org in USD. Agents never hold wallets or `$LGT`.
 Three things an agent shouldn't have to do:
 
 1. **Hold crypto.** Agent code shouldn't custody a private key or
-   manage a `$LGT` balance. Both are operator concerns.
+   manage a `AVOW` balance. Both are operator concerns.
 2. **Wait for chain confirmation.** Agent tool-use loops are
    latency-sensitive; the relayer absorbs the wait + retry behind a
    single MCP call.
@@ -46,7 +46,7 @@ Overages on Free / Pro: hard-stop with a clear error from the MCP
 server. Enterprise: soft-bill with notification.
 
 Margin-positive over chain costs at every tier. The relayer pays gas
-in `$LGT`, the org pays USD. Independent of `$LGT` price for the
+in `AVOW`, the org pays USD. Independent of `AVOW` price for the
 billing customer.
 
 ## Architecture
@@ -83,7 +83,7 @@ billing customer.
 
 ## Signer pool
 
-The relayer rotates through a pool of operator-funded `$LGT` signing
+The relayer rotates through a pool of operator-funded `AVOW` signing
 keys. Each key:
 
 - Pre-funded at the start of a billing window
@@ -131,7 +131,7 @@ and works against:
   `IRIS_SIGNER_PRIVATE_KEY` and let the MCP server sign + submit
   itself)
 
-In the direct-signing mode the org pays gas in `$LGT` and forgoes
+In the direct-signing mode the org pays gas in `AVOW` and forgoes
 the USD billing layer. Same chain primitives, different operational
 model.
 
