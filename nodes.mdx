@@ -41,9 +41,9 @@ the sizing above reflects what a third-party operator would
 provision.
 
 <Note>
-  OS: **Ubuntu 24.04 LTS**. The released `ligate-node` binary links
-  against GLIBC 2.39; Debian 12 ships GLIBC 2.36 and won't load the
-  binary without rebuilding from source.
+  Linux binaries are built on Ubuntu 22.04 (GLIBC 2.35) so they run
+  on every common server distro: Ubuntu 22.04+, Debian 12+, RHEL 9,
+  Amazon Linux 2023. Older distros need a from-source build.
 </Note>
 
 Persistent data disk supports **live resize** via `gcloud compute
