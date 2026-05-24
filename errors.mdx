@@ -253,13 +253,18 @@ it persists more than an hour, ping us on Discord.
 
 ## Node operation
 
-### `version GLIBC_2.39 not found`
+### `version GLIBC_2.NN not found` (where NN > 35)
 
-**Why:** Pre-built `ligate-node` binary links against GLIBC 2.39.
-Debian 12 ships GLIBC 2.36.
+**Why:** Your distro ships an older GLIBC than the version the
+released `ligate-node` binary was built against. Releases from
+v0.2.15 onward target GLIBC 2.35 (Ubuntu 22.04 build env, chain#345)
+which covers Ubuntu 22.04+, Debian 12+, RHEL 9, Amazon Linux 2023.
 
-**Fix:** Use Ubuntu 24.04 LTS (the released binary's build target),
-or build from source on your distro.
+**Fix:** If you're on Ubuntu ≥22.04 / Debian ≥12 / RHEL ≥9 and still
+hit this, you're probably on an older v0.1.x or v0.2.x binary built
+on Ubuntu 24.04. Upgrade to the latest release. Otherwise (Ubuntu
+20.04, CentOS 7, anything pre-2022): build from source on the host
+or use a newer base image.
 
 ### `Branch cla/signatures not found` (in CLA Assistant CI on PR)
 
