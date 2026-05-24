@@ -162,7 +162,7 @@ client.
 | ------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------ |
 | `/v1/rollup/info`                                      | GET    | Chain identity: `chain_id`, `chain_hash` (hex, 64 chars), `version` (binary `CARGO_PKG_VERSION`) |
 | `/v1/rollup/sync-status`                               | GET    | Whether the node is caught up to the DA layer                                                    |
-| `/v1/rollup/base-fee-per-gas/latest`                   | GET    | Current per-gas base fee in `$LGT`                                                               |
+| `/v1/rollup/base-fee-per-gas/latest`                   | GET    | Current per-gas base fee in `AVOW`                                                               |
 | `/v1/rollup/constants`                                 | GET    | Governance-tunable constants (current values)                                                    |
 | `/v1/rollup/schema`                                    | GET    | Universal-wallet TX schema, the typed Borsh layout of every `CallMessage` variant                |
 | `/v1/rollup/addresses/{credential_id}/dedup`           | GET    | Account dedup state for a given credential id                                                    |
@@ -217,12 +217,12 @@ plus 11 auto-mounted state endpoints.
 There is **no** `list_by_schema`, `list_by_submitter`, or similar.
 Those queries belong in the [HTTP API](/api) indexer.
 
-### `bank` module (`$LGT` and other tokens)
+### `bank` module (`AVOW` and other tokens)
 
 Mounted at `/v1/modules/bank`. The two most useful endpoints:
 
 ```bash
-# $LGT balance for an address
+# AVOW balance for an address
 curl https://rpc.ligate.io/v1/modules/bank/tokens/gas_token/balances/lig1...
 # { "data": { "amount": "100000000000", "tokenId": "..." } }
 
@@ -230,8 +230,8 @@ curl https://rpc.ligate.io/v1/modules/bank/tokens/gas_token/balances/lig1...
 curl https://rpc.ligate.io/v1/modules/bank/tokens/{tokenId}/total-supply
 ```
 
-`$LGT` uses **9 decimals** on the wire (smallest unit = 1 nano `$LGT`
-= `0.000000001 $LGT`). All API amounts are in base units (`u64`
+`AVOW` uses **9 decimals** on the wire (smallest unit = 1 nano `AVOW`
+= `0.000000001 AVOW`). All API amounts are in base units (`u64`
 nanos).
 
 ## WebSocket streams

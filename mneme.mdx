@@ -1,7 +1,7 @@
 ---
 title: 'Mneme'
 sidebarTitle: 'Overview'
-description: 'Mneme is the first-party browser wallet for Ligate. Holds $LGT, signs every chain transaction, ships with a one-click Attest with Mneme button for ChatGPT, Claude, and Gemini.'
+description: 'Mneme is the first-party browser wallet for Ligate. Holds AVOW, signs every chain transaction, ships with a one-click Attest with Mneme button for ChatGPT, Claude, and Gemini.'
 ---
 
 Mneme is the first-party browser wallet for Ligate Chain.
@@ -52,9 +52,9 @@ ligate keys generate --name alice
 # One-time env setup
 export LIGATE_CHAIN_ID=4242
 export LIGATE_CHAIN_HASH=$(ligate info --json | jq -r .chain_hash)
-export LIGATE_LGT_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
+export LIGATE_AVOW_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
 
-# Sign and submit a $LGT transfer
+# Sign and submit a AVOW transfer
 ligate transfer --to lig1... --amount 0.5 --signer alice
 
 # Themisra attestation: register-attestor-set + register-schema (one-time)

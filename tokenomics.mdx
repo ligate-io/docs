@@ -1,10 +1,10 @@
 ---
 title: 'Tokenomics'
 sidebarTitle: 'Tokenomics'
-description: '$LGT token: one billion fixed supply, distribution schedule, fee structure (registration + per-attestation), builder/treasury routing, value accrual.'
+description: 'AVOW token: one billion fixed supply, distribution schedule, fee structure (registration + per-attestation), builder/treasury routing, value accrual.'
 ---
 
-One token, one economic surface. `$LGT` pays rollup gas, registration fees,
+One token, one economic surface. `AVOW` pays rollup gas, registration fees,
 per-attestation fees, and routes value to both builders and the protocol
 treasury.
 
@@ -15,7 +15,7 @@ treasury.
 
 ## Supply
 
-Fixed total supply of **1,000,000,000 $LGT**. No inflationary issuance
+Fixed total supply of **1,000,000,000 AVOW**. No inflationary issuance
 beyond the initial distribution schedule.
 
 ## Distribution
@@ -31,16 +31,16 @@ beyond the initial distribution schedule.
 
 ## Protocol fees
 
-Three classes of fee at the protocol level, all paid in `$LGT`.
+Three classes of fee at the protocol level, all paid in `AVOW`.
 
 ### Registration
 
-- `RegisterAttestorSet`, default 10 `$LGT`, 100% to treasury
-- `RegisterSchema`, default 100 `$LGT`, 100% to treasury
+- `RegisterAttestorSet`, default 10 `AVOW`, 100% to treasury
+- `RegisterSchema`, default 100 `AVOW`, 100% to treasury
 
 ### Per attestation
 
-Default **0.001 `$LGT`** per `SubmitAttestation`. Split per schema: 0 to 50%
+Default **0.001 `AVOW`** per `SubmitAttestation`. Split per schema: 0 to 50%
 routes to the schema's builder address, the remainder goes to the treasury.
 Schema owners pick the split at registration. Changing the split requires a
 schema version bump.
@@ -49,15 +49,15 @@ schema version bump.
 
 The protocol is permissionless. Any third-party schema pays the same fees
 that Themisra, Mneme, and Iris pay. Every attestation in the ecosystem,
-across every app, accrues fee revenue to `$LGT`. The token is not a claim
+across every app, accrues fee revenue to `AVOW`. The token is not a claim
 on a single product; it is the settlement asset for a category. If a single
 flagship underperforms but other flagships or third-party schemas win,
-`$LGT` value still accrues.
+`AVOW` value still accrues.
 
 ## Node and attestor rewards
 
 Node operators share transaction fees and block rewards from the 300M Node
-Rewards allocation, on a decreasing emission curve. Attestors stake `$LGT`
+Rewards allocation, on a decreasing emission curve. Attestors stake `AVOW`
 and earn per-attestation fees; equivocation is slashable (the `disputes`
 module in v1 formalises slashing).
 

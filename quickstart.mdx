@@ -1,10 +1,10 @@
 ---
 title: 'Quickstart'
 sidebarTitle: 'Quickstart'
-description: 'Install the Ligate CLI, claim testnet $LGT, and ship your first attestation against ligate-devnet-1. End-to-end in under five minutes.'
+description: 'Install the Ligate CLI, claim testnet AVOW, and ship your first attestation against ligate-devnet-1. End-to-end in under five minutes.'
 ---
 
-Install the Ligate CLI, claim testnet `$LGT` from the faucet, and ship
+Install the Ligate CLI, claim testnet `AVOW` from the faucet, and ship
 your first attestation against `ligate-devnet-1`. End-to-end in under
 five minutes.
 
@@ -44,13 +44,13 @@ five minutes.
     ```
   </Step>
 
-  <Step title="Claim testnet $LGT">
-    The public devnet faucet drips 100 `$LGT` to any address once per
+  <Step title="Claim testnet AVOW">
+    The public devnet faucet drips 100 `AVOW` to any address once per
     24 hours.
 
     ```bash
     ligate faucet $(ligate keys show alice)
-    # ✓ 100 $LGT sent
+    # ✓ 100 AVOW sent
     #   tx ltx1zd2qmly…ljgth4
     ```
 
@@ -64,24 +64,24 @@ five minutes.
     you don't have to repeat it.
 
     ```bash
-    export LIGATE_LGT_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
+    export LIGATE_AVOW_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
 
     ligate balance $(ligate keys show alice) --json
     # {
     #   "address": "lig1...",
     #   "token_id": "token_1nyl...",
     #   "amount_nano": 100000000000,
-    #   "amount_lgt": 100.0
+    #   "amount_avow": 100.0
     # }
     ```
 
-    Amount is in nano `$LGT` (9 decimals). 100,000,000,000 nano =
-    100 `$LGT`.
+    Amount is in nano `AVOW` (9 decimals). 100,000,000,000 nano =
+    100 `AVOW`.
   </Step>
 
   <Step title="Send your first transfer">
     The simplest write path: a `bank.transfer`. Generate a second
-    keypair, transfer `0.5 $LGT` to it.
+    keypair, transfer `0.5 AVOW` to it.
 
     ```bash
     ligate keys generate --name bob
@@ -94,7 +94,7 @@ five minutes.
     ligate transfer --to $BOB --amount 0.5 --signer alice
     # ✓ transfer submitted
     #   tx ltx1...
-    #   amount 0.5 $LGT to lig1...
+    #   amount 0.5 AVOW to lig1...
     ```
 
     Verify with `ligate balance $BOB`.
@@ -179,7 +179,7 @@ schema's `attestor_set`) is documented in the
 
   <Card title="Run an attestor node" icon="server" href="/nodes">
     Sign Proof of Prompt receipts, post blobs to Celestia, earn
-    testnet `$LGT`.
+    testnet `AVOW`.
   </Card>
 
   <Card
