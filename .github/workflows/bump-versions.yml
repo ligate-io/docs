@@ -37,6 +37,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Pre-emptive: when Dependabot eventually bumps to
+          # actions/checkout@v6, the v6 default of
+          # `persist-credentials: true` collides with
+          # `peter-evans/create-pull-request@v6`'s own `Authorization`
+          # header, producing `Duplicate header` and a git HTTP 400.
+          # Setting this now (harmless on v4) keeps the auto-bump
+          # workflow green across that future bump. See
+          # ligate-io/ligate-chain#501 for the reactive fix after it
+          # broke there on the chain v0.3.1 release dispatch.
+          persist-credentials: false
 
       - name: Install yq
         run: |
