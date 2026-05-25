@@ -54,7 +54,7 @@ export LIGATE_CHAIN_ID=4242
 export LIGATE_CHAIN_HASH=$(ligate info --json | jq -r .chain_hash)
 export LIGATE_AVOW_TOKEN_ID=token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7
 
-# Sign and submit a AVOW transfer
+# Sign and submit an AVOW transfer
 ligate transfer --to lig1... --amount 0.5 --signer alice
 
 # Themisra attestation: register-attestor-set + register-schema (one-time)
