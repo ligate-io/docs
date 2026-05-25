@@ -171,7 +171,7 @@ client.
 `/v1/rollup/info` returns three identifiers with different roles:
 
 - **`chain_id`**, the wallet- and explorer-facing ladder string
-  (`ligate-localnet`, `ligate-devnet-1`, `ligate-testnet-N`,
+  (`ligate-localnet`, `ligate-devnet-1`, `ligate-devnet-2`, `ligate-testnet-N`,
   `ligate-1`); bumps only on a state-breaking restart.
 - **`chain_hash`**, 32-byte build-time fingerprint of the runtime
   composition; bumps on every STF change and pins the tx-signing
@@ -182,7 +182,7 @@ Wallets and SDKs pin `chain_hash` on connect.
 
 ```bash
 curl https://rpc.ligate.io/v1/rollup/info
-# {"chain_id":"ligate-devnet-1","chain_hash":"abcd...","version":"0.2.3"}
+# {"chain_id":"ligate-devnet-2","chain_hash":"abcd...","version":"0.2.3"}
 ```
 
 <Note>

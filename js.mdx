@@ -20,7 +20,7 @@ zero `Buffer` dependency, written against native `BigInt` + `fetch`
 ## Install
 
 ```bash
-# Current release (ligate-devnet-1 wire format).
+# Current release (ligate-devnet-2 wire format).
 pnpm add @ligate-labs/sdk
 
 # Or pin to the v0.2.x line:
@@ -309,7 +309,7 @@ it or debugging.
 - **Signature is over `borsh(UnsignedTransaction) ++ chain_hash`.**
   The 32-byte chain hash binds signatures to the runtime version;
   comes from `GET /v1/rollup/info`. Without it, a signature for
-  `ligate-localnet` would also work on `ligate-devnet-1`, which the
+  `ligate-localnet` would also work on `ligate-devnet-2`, which the
   chain explicitly prevents.
 
 ## Compatibility

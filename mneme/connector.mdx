@@ -43,14 +43,14 @@ Return types are JSON-serializable.
 | ------------------------ | ---------------- | ------------------------------------ |
 | `mneme_requestAccounts`  | (none)           | `[address]`, prompts user if first time |
 | `mneme_accounts`         | (none)           | Currently-connected accounts, no prompt |
-| `mneme_chainId`          | (none)           | `"ligate-devnet-1"` (string), or `"ligate-1"` post-mainnet |
+| `mneme_chainId`          | (none)           | `"ligate-devnet-2"` (string), or `"ligate-1"` post-mainnet |
 | `mneme_chainHash`        | (none)           | 32-byte chain hash hex (for tx domain separation) |
 
 ### Chain identity methods
 
 ```ts
 const chainId = await window.mneme.request({ method: 'mneme_chainId' })
-// → "ligate-devnet-1"
+// → "ligate-devnet-2"
 
 const chainHash = await window.mneme.request({ method: 'mneme_chainHash' })
 // → "abcd...64chars"
