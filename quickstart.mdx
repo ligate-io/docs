@@ -108,6 +108,18 @@ a Schema, sign with each attestor's key, submit the threshold-signed
 attestation. There's no `ligate attest` convenience, the chain
 primitives are deliberately decomposed.
 
+<Tip>
+  **Schemas pay you.** When you register a Schema you set
+  `fee_routing_bps` (0 to 5000, where 5000 is half) and
+  `fee_routing_addr`. Every attestation submitted under your schema
+  then splits `total_fee × bps / 10000` to your address. The chain
+  enforces the split at state-transition time. No staking, no
+  application, no listing fee. The example below uses 1000 (10%)
+  routed to `alice`. See [Pre-testnet
+  economics](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/pre-testnet-economics.md)
+  for the full earning story.
+</Tip>
+
 For a single-machine smoke test (1-of-1 attestor set with your own
 key):
 
@@ -126,7 +138,8 @@ cat > schema.json <<EOF
   "name": "alice.smoke-test",
   "version": 1,
   "attestor_set_id": "las1...",
-  "fee_routing_bps": 0,
+  "fee_routing_bps": 1000,
+  "fee_routing_addr": "$(ligate keys show alice)",
   "payload_spec_hash": "<32-byte hex sha256 of a payload JSON-Schema>"
 }
 EOF
