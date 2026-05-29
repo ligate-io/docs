@@ -166,7 +166,7 @@ Client  ──build tx──▶  Borsh(Transaction::V0)  ──sign──▶  ed
 Every signature is over `borsh(UnsignedTransaction) ++ chain_hash`
 (where `chain_hash` is the build-time fingerprint of the runtime).
 This binds signatures to a specific runtime composition; a signature
-for `ligate-localnet` won't validate on `ligate-devnet-2`, etc.
+for `ligate-localnet` won't validate on `ligate-devnet-3`, etc.
 
 Transaction submission is fire-and-poll. The sequencer returns a
 queue-receipt tx hash; clients poll `/v1/ledger/txs/{hash}` for
