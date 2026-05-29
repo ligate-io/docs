@@ -82,12 +82,12 @@ docker pull ghcr.io/ligate-io/ligate-chain:0.4.0   # or :latest
 # Run against the in-process MockDa (zero external services), config
 # + genesis mounted from a host checkout of the chain repo:
 docker run --rm -it \
-  -v /path/to/ligate-chain/devnet:/var/lib/ligate/devnet:ro \
+  -v /path/to/ligate-chain/localnet:/var/lib/ligate/localnet:ro \
   -v ligate-state:/var/lib/ligate/state \
   -p 12346:12346 \
   ghcr.io/ligate-io/ligate-chain:0.4.0 \
-  --rollup-config-path /var/lib/ligate/devnet/rollup.toml \
-  --genesis-config-dir /var/lib/ligate/devnet/genesis
+  --rollup-config-path /var/lib/ligate/localnet/rollup.toml \
+  --genesis-config-dir /var/lib/ligate/localnet/genesis
 ```
 
 The image is debian-slim, runs as the unprivileged `ligate` user
@@ -121,12 +121,12 @@ deps.
 ## Configure
 
 The public devnet config lives at
-[`devnet-1/`](https://github.com/ligate-io/ligate-chain/tree/main/devnet-1)
+[`devnet/`](https://github.com/ligate-io/ligate-chain/tree/main/devnet)
 in the chain repo. Two files matter:
 
-- **`devnet-1/celestia.toml`**, rollup config: chain identity, DA
+- **`devnet/celestia.toml`**, rollup config: chain identity, DA
   layer, storage paths, sequencer endpoint
-- **`devnet-1/genesis/`**, one JSON per runtime module (accounts,
+- **`devnet/genesis/`**, one JSON per runtime module (accounts,
   attestation, attester_incentives, bank, chain_state,
   operator_incentives, prover_incentives, sequencer_registry)
 
@@ -144,11 +144,11 @@ Production deploys override secrets via env vars; never commit them.
 ```bash
 SOV_CELESTIA_RPC_URL=ws://127.0.0.1:26658 \
 SOV_CELESTIA_GRPC_URL=http://127.0.0.1:9090 \
-SOV_CELESTIA_SIGNER_KEY=$(pass celestia/devnet-1-signer) \
+SOV_CELESTIA_SIGNER_KEY=$(pass celestia/devnet-signer) \
 ligate-node \
     --da-layer celestia \
-    --rollup-config-path devnet-1/celestia.toml \
-    --genesis-config-dir devnet-1/genesis
+    --rollup-config-path devnet/celestia.toml \
+    --genesis-config-dir devnet/genesis
 ```
 
 This assumes a co-located Celestia light node at the default RPC +
@@ -156,10 +156,10 @@ gRPC ports. The light-node setup is covered in the
 [Celestia light node runbook](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/runbooks/celestia-light-node.md).
 
 For local development against `MockDa` (no Celestia required), boot
-from the simpler `devnet/` config:
+from the simpler `localnet/` config:
 
 ```bash
-ligate-node  # picks up devnet/rollup.toml + devnet/genesis by default
+ligate-node  # picks up localnet/rollup.toml + localnet/genesis by default
 ```
 
 REST binds to `127.0.0.1:12346` for local dev,
@@ -242,7 +242,7 @@ verifiable work and post a bond.
 
 ### Today: attestor sets
 
-This is the one earn-path live on `devnet-1` and open to anyone:
+This is the one earn-path live on `ligate-devnet-3` and open to anyone:
 
 1. Register an attestor set (`ligate register-attestor-set`). Costs a
    one-time bond.
@@ -274,7 +274,7 @@ ligate register-schema \
 # 4. Submit attestations, or wait for others to submit under your schema
 ```
 
-`devnet-1` already has live attestor sets earning fees today.
+`ligate-devnet-3` already has live attestor sets earning fees today.
 [`docs.ligate.io/cli#ligate-register-attestor-set`](/cli#ligate-register-attestor-set)
 walks the flow in detail.
 
@@ -284,7 +284,7 @@ Three mechanisms are in the protocol design and incrementally
 shipping. None of them are "run a sync node, get tokens", all
 require posting a bond and doing verifiable work.
 
-1. **Decentralised sequencer set (v1+).** Today devnet-1 runs a
+1. **Decentralised sequencer set (v1+).** Today ligate-devnet-3 runs a
    single registered sequencer (Ligate Labs). The chain code already
    supports a Postgres-coordinated multi-sequencer cluster (see the
    "Multi-sequencer (DbElected)" section below), but the registered
@@ -321,14 +321,14 @@ A Ligate Labs operator can run a federated cluster of `ligate-node`
 instances against a shared Postgres-backed leader election. Exactly
 one node acts as `BatchProducer` at a time; the others stand by as
 `PgSyncReplica` and take over via in-process role transition if the
-leader fails. On `devnet-1` we run a three-node cluster and a forced-
+leader fails. On `ligate-devnet-3` we run a three-node cluster and a forced-
 failover drill measured **~1.2 seconds** from kill to new leader
 producing batches, with no operator intervention.
 
 To activate `DbElected` on your own cluster:
 
 1. Provision a Postgres instance reachable from every sequencer VM
-   (we use Cloud SQL HA on devnet-1; any Postgres 14+ works).
+   (we use Cloud SQL HA on ligate-devnet-3; any Postgres 14+ works).
 2. Add a `[sequencer.preferred.postgres_config]` block to each VM's
    rollup config:
    ```toml
